@@ -13,6 +13,7 @@ from app.schemas.employee import (
 from app.services.employee_service import EmployeeService
 from app.repositories.salary_repo import SalaryRepository
 from app.repositories.planning_repo import PlanningRepository
+from app.repositories.employee_analytics_repo import EmployeeAnalyticsRepository
 from app.api.v1.dependencies import get_current_user, RoleChecker
 from app.models.user import User
 
@@ -153,3 +154,35 @@ def get_employee_projection(
             detail="No projected salary records found for this employee."
         )
     return projection
+
+
+@router.get("/{employee_id}/analytics")
+def get_employee_analytics(
+    employee_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns decision-support analytics for a single employee in the planning screen:
+    - current_year_increment: live ((projected - current) / current) * 100
+    - historical_average_increment: average YoY % from salary_history
+    - team_average_increment: average planned increment across the manager's visible team
+    RBAC: Managers are scoped to their own team; HR and Director see org-wide team averages.
+    """
+    # Enforce scope: manager cannot query analytics for another manager's employee
+    service = EmployeeService(db)
+    emp = service.get_employee_detail(employee_id, current_user)
+    if not emp:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found or access denied."
+        )
+
+    # Apply RBAC for team average scoping
+    manager_id = current_user.id if current_user.role.name == "Manager" else None
+
+    analytics_repo = EmployeeAnalyticsRepository(db)
+    return analytics_repo.get_employee_analytics(
+        employee_id=employee_id,
+        manager_id=manager_id
+    )

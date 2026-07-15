@@ -208,6 +208,9 @@ export const EmployeeListPage: React.FC = () => {
                     <th className="px-5 py-3">Department</th>
                     <th className="px-5 py-3">Reporting Manager</th>
                     <th className="px-5 py-3">Designation</th>
+                    <th className="px-4 py-3 text-right text-indigo-600">Curr. Yr %</th>
+                    <th className="px-4 py-3 text-right text-slate-500">Hist. Avg %</th>
+                    <th className="px-4 py-3 text-right text-emerald-600">Team Avg %</th>
                     <th className="px-5 py-3 text-right">Current CTC</th>
                     <th className="px-5 py-3 text-right">Projected CTC</th>
                     <th className="px-5 py-3 text-center">Status</th>
@@ -220,13 +223,27 @@ export const EmployeeListPage: React.FC = () => {
                       key={emp.id}
                       className="group hover:bg-indigo-50/30 transition-colors"
                     >
-                      <td className="px-5 py-3.5 font-mono font-medium text-slate-500">
-                        {emp.id}
-                      </td>
+                      <td className="px-5 py-3.5 font-mono font-medium text-slate-500">{emp.id}</td>
                       <td className="px-5 py-3.5 font-semibold text-slate-900">{emp.name}</td>
                       <td className="px-5 py-3.5 text-slate-600">{emp.department_name}</td>
                       <td className="px-5 py-3.5 text-slate-500">{emp.manager_name || '—'}</td>
                       <td className="px-5 py-3.5 text-slate-600">{emp.current_designation}</td>
+                      {/* Analytics columns */}
+                      <td className="px-4 py-3.5 text-right">
+                        {emp.current_year_increment != null
+                          ? <span className="font-bold text-indigo-700 font-mono">+{Number(emp.current_year_increment).toFixed(2)}%</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        {emp.historical_average_increment != null
+                          ? <span className="font-medium text-slate-700 font-mono">{Number(emp.historical_average_increment).toFixed(2)}%</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        {emp.team_average_increment != null
+                          ? <span className="font-medium text-emerald-700 font-mono">{Number(emp.team_average_increment).toFixed(2)}%</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-5 py-3.5 text-right font-medium text-slate-700">{formatCurrency(emp.current_ctc)}</td>
                       <td className="px-5 py-3.5 text-right font-semibold text-indigo-900">
                         {emp.projected_ctc > 0 ? formatCurrency(emp.projected_ctc) : '—'}

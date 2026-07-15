@@ -15,10 +15,12 @@ class DashboardRepository:
 
     def get_kpis(self, manager_id: int = None) -> Dict[str, Any]:
         """
-        Aggregate total employees, total current payroll, projected payroll, and completion percentage.
-        Supports filtering by manager_id for team scoping.
+        Aggregate KPI metrics for dashboard.
+        Returns: team_size, pending_plans, completed_plans, planning_progress,
+                 average_increment, budget_variance, plus legacy payroll fields for charts.
+        Supports filtering by manager_id for Manager role scoping.
         """
-        # 1. Employee Count
+        # 1. Employee Count (team_size)
         emp_query = self.db.query(Employee).filter(Employee.status == "Active")
         if manager_id is not None:
             emp_query = emp_query.filter(Employee.manager_id == manager_id)
@@ -50,7 +52,7 @@ class DashboardRepository:
         if projected_payroll == 0.0:
             projected_payroll = current_payroll
 
-        # 4. Planning Progress counts
+        # 4. Planning Progress counts (Completed / In Progress / Not Started)
         plan_query = self.db.query(
             SalaryPlan.status,
             func.count(SalaryPlan.id)
@@ -63,14 +65,59 @@ class DashboardRepository:
         inprogress_count = plan_counts.get("In Progress", 0)
         notstarted_count = max(0, total_employees - completed_count - inprogress_count)
 
-        completion_rate = (completed_count / total_employees * 100) if total_employees > 0 else 0.0
+        # Pending = all employees who have not completed their plan
+        pending_count = total_employees - completed_count
+
+        # Planning Progress % = (completed / total) * 100
+        planning_progress = round((completed_count / total_employees * 100), 1) if total_employees > 0 else 0.0
+
+        # Completion rate (kept for backward compat)
+        completion_rate = planning_progress
+
+        # 5. Average Increment % across all employees in scope
+        # Uses average of ((projected_ctc - current_ctc) / current_ctc) * 100
+        from sqlalchemy import case
+        current_ctc_expr = (
+            CurrentSalary.fixed_pay +
+            CurrentSalary.variable_pay +
+            CurrentSalary.mediclaim +
+            CurrentSalary.gratuity +
+            CurrentSalary.retention_bonus
+        )
+        avg_inc_query = self.db.query(
+            func.avg(
+                case(
+                    (
+                        current_ctc_expr > 0,
+                        ((ProjectedSalary.projected_ctc - current_ctc_expr) / current_ctc_expr) * 100
+                    ),
+                    else_=0.0
+                )
+            )
+        ).select_from(Employee)\
+         .join(CurrentSalary, CurrentSalary.employee_id == Employee.id)\
+         .join(ProjectedSalary, ProjectedSalary.employee_id == Employee.id)\
+         .filter(Employee.status == "Active")
+        if manager_id is not None:
+            avg_inc_query = avg_inc_query.filter(Employee.manager_id == manager_id)
+        average_increment = float(avg_inc_query.scalar() or 0.0)
+
+        budget_variance = float(projected_payroll - current_payroll)
 
         return {
+            # New business KPIs
+            "team_size": total_employees,
+            "pending_plans": pending_count,
+            "completed_plans": completed_count,
+            "planning_progress": planning_progress,
+            "average_increment": round(average_increment, 2),
+            "budget_variance": budget_variance,
+            # Legacy fields — retained for department charts
             "total_employees": total_employees,
             "current_payroll": float(current_payroll),
             "projected_payroll": float(projected_payroll),
-            "payroll_growth": float(projected_payroll - current_payroll),
-            "payroll_growth_pct": float(((projected_payroll - current_payroll) / current_payroll * 100) if current_payroll > 0 else 0.0),
+            "payroll_growth": budget_variance,
+            "payroll_growth_pct": round(average_increment, 2),
             "completed_count": completed_count,
             "inprogress_count": inprogress_count,
             "notstarted_count": notstarted_count,

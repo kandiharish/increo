@@ -1,7 +1,10 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case
 from app.repositories.employee_repo import EmployeeRepository
 from app.models.user import User
 from app.models.employee import Employee
+from app.models.current_salary import CurrentSalary
+from app.models.projected_salary import ProjectedSalary
 from typing import Optional, List, Dict, Any, Tuple
 from decimal import Decimal
 
@@ -22,6 +25,8 @@ class EmployeeService:
         """
         Retrieves a paginated and formatted list of employees.
         Enforces manager reporting scoping.
+        Includes three analytics columns: current_year_increment, historical_average_increment,
+        and team_average_increment — all computed without N+1 queries.
         """
         # If user is a Manager, override manager filter with the user's ID
         # to restrict query results to their reportees
@@ -39,6 +44,38 @@ class EmployeeService:
             designation=designation,
         )
 
+        # ── Team Average Increment ────────────────────────────────────────────
+        # Pre-compute in ONE SQL aggregate before the employee loop (avoids N+1).
+        # Scope: same manager filter as the employee list.
+        # Formula: AVG( ((projected_ctc - current_ctc) / current_ctc) * 100 )
+        db = self.employee_repo.db
+        current_ctc_expr = (
+            CurrentSalary.fixed_pay +
+            CurrentSalary.variable_pay +
+            CurrentSalary.mediclaim +
+            CurrentSalary.gratuity +
+            CurrentSalary.retention_bonus
+        )
+        team_avg_query = db.query(
+            func.avg(
+                case(
+                    (
+                        current_ctc_expr > 0,
+                        ((ProjectedSalary.projected_ctc - current_ctc_expr) / current_ctc_expr) * 100
+                    ),
+                    else_=None
+                )
+            )
+        ).select_from(Employee)\
+         .join(CurrentSalary, CurrentSalary.employee_id == Employee.id)\
+         .join(ProjectedSalary, ProjectedSalary.employee_id == Employee.id)\
+         .filter(Employee.status == "Active")
+        if active_manager_id is not None:
+            team_avg_query = team_avg_query.filter(Employee.manager_id == active_manager_id)
+        team_avg_scalar = team_avg_query.scalar()
+        team_average_increment = round(float(team_avg_scalar), 2) if team_avg_scalar is not None else None
+        # ─────────────────────────────────────────────────────────────────────
+
         formatted_items = []
         for emp in employees:
             # 1. Sum current CTC components
@@ -52,27 +89,31 @@ class EmployeeService:
             if emp.projection:
                 projected_ctc = emp.projection.projected_ctc
                 
-            # 3. Resolve planning status (Check if a plan has been created)
+            # 3. Resolve planning status
             planning_status = "Not Started"
             if emp.planning_inputs:
-                # In our setup, seed plan inputs have status
-                # If there are multiple plans, get the last status or default Submitted
-                # We can iterate or take list index 0
                 planning_status = emp.planning_inputs[0].status if len(emp.planning_inputs) > 0 else "Not Started"
-            # 4. Calculate historical average increment
+
+            # 4. Current Year Increment % = ((projected - current) / current) * 100
+            current_year_increment = None
+            if current_ctc and current_ctc > 0 and projected_ctc and projected_ctc > 0:
+                current_year_increment = round(
+                    float(((projected_ctc - current_ctc) / current_ctc) * 100), 2
+                )
+
+            # 5. Historical Average Increment (already joined via salary_history eager load)
             historical_average_increment = None
             if emp.salary_history and len(emp.salary_history) >= 2:
-                # Sort history by financial_year
                 history = sorted(emp.salary_history, key=lambda x: x.financial_year)
                 increments = []
                 for i in range(1, len(history)):
                     prev_ctc = history[i - 1].ctc
                     curr_ctc = history[i].ctc
                     if prev_ctc and prev_ctc > 0:
-                        inc_pct = ((curr_ctc - prev_ctc) / prev_ctc) * 100
+                        inc_pct = float(((curr_ctc - prev_ctc) / prev_ctc) * 100)
                         increments.append(inc_pct)
                 if increments:
-                    historical_average_increment = sum(increments) / len(increments)
+                    historical_average_increment = round(sum(increments) / len(increments), 2)
 
             formatted_items.append({
                 "id": emp.id,
@@ -84,12 +125,16 @@ class EmployeeService:
                 "current_ctc": current_ctc,
                 "projected_ctc": projected_ctc,
                 "planning_status": planning_status,
-                "historical_average_increment": historical_average_increment
+                "current_year_increment": current_year_increment,
+                "historical_average_increment": historical_average_increment,
+                "team_average_increment": team_average_increment,
             })
 
         return formatted_items, total
 
+
     def get_employee_detail(self, employee_id: str, current_user: User) -> Optional[Employee]:
+
         """
         Fetches an employee detail profile and validates scoping permissions.
         Calculates historical average increment.

@@ -24,6 +24,7 @@ import {
   Clock,
   AlertCircle,
   Lightbulb,
+  BarChart2,
 } from 'lucide-react';
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#64748b'];
@@ -56,13 +57,13 @@ export const DashboardPage: React.FC = () => {
       });
     }
 
-    if (data.kpis.completion_rate < 100) {
+    if (data.kpis.planning_progress < 100) {
       messages.push({
         title: 'Planning Cycle Incomplete',
-        text: `There are ${data.kpis.inprogress_count + data.kpis.notstarted_count} appraisals still pending submission.`,
+        text: `There are ${data.kpis.pending_plans} appraisals still pending submission.`,
         type: 'info',
       });
-    } else if (data.kpis.total_employees > 0) {
+    } else if (data.kpis.team_size > 0) {
       messages.push({
         title: 'Planning Complete',
         text: 'All appraisals have been successfully submitted for the current cycle.',
@@ -105,9 +106,6 @@ export const DashboardPage: React.FC = () => {
 
   const { kpis, departments, activities } = data;
 
-  const pendingReviews = kpis.inprogress_count + kpis.notstarted_count;
-  const employeesRemaining = kpis.total_employees - kpis.completed_count;
-
   // Prepare chart data for department comparison
   const deptChartData = departments.map((d) => ({
     name: d.department_name,
@@ -133,72 +131,72 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards Grid - 6 Cards */}
+      {/* KPI Cards Grid - 6 Business-Oriented Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {/* Pending Reviews */}
+        {/* 1. Pending Plans */}
         <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Pending</span>
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Pending Plans</span>
             <Clock size={16} className="text-amber-500" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{pendingReviews}</span>
+            <span className="text-2xl font-bold text-slate-900">{kpis.pending_plans}</span>
           </div>
         </div>
 
-        {/* Completed Reviews */}
+        {/* 2. Completed Plans */}
         <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Completed</span>
             <CheckCircle2 size={16} className="text-emerald-500" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{kpis.completed_count}</span>
+            <span className="text-2xl font-bold text-slate-900">{kpis.completed_plans}</span>
           </div>
         </div>
 
-        {/* Avg Increment % */}
+        {/* 3. Planning Progress % */}
+        <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Progress</span>
+            <BarChart2 size={16} className="text-indigo-500" />
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-indigo-700">{kpis.planning_progress.toFixed(1)}%</span>
+          </div>
+        </div>
+
+        {/* 4. Avg Increment % */}
         <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Avg Increment</span>
             <TrendingUp size={16} className="text-indigo-500" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-indigo-700">+{kpis.payroll_growth_pct.toFixed(2)}%</span>
+            <span className="text-2xl font-bold text-indigo-700">+{kpis.average_increment.toFixed(2)}%</span>
           </div>
         </div>
 
-        {/* Budget Variance */}
+        {/* 5. Budget Variance */}
         <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow col-span-1 md:col-span-3 lg:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Budget Variance</span>
             <DollarSign size={16} className="text-indigo-500" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-lg font-bold text-slate-900">+{formatCurrency(kpis.payroll_growth)}</span>
+            <span className="text-lg font-bold text-slate-900">+{formatCurrency(kpis.budget_variance)}</span>
           </div>
         </div>
 
-        {/* Employees Planned */}
+        {/* 6. Team Size */}
         <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Planned (FTE)</span>
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Team Size</span>
             <Users size={16} className="text-slate-400" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{kpis.completed_count}</span>
-            <span className="text-[10px] text-slate-400 font-medium">/ {kpis.total_employees}</span>
-          </div>
-        </div>
-
-        {/* Employees Remaining */}
-        <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Remaining (FTE)</span>
-            <AlertCircle size={16} className={employeesRemaining > 0 ? "text-amber-500" : "text-emerald-500"} />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{employeesRemaining}</span>
+            <span className="text-2xl font-bold text-slate-900">{kpis.team_size}</span>
+            <span className="text-[10px] text-slate-400 font-medium">FTEs</span>
           </div>
         </div>
       </div>

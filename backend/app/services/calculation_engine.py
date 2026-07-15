@@ -35,9 +35,10 @@ class CalculationEngine:
         # If current mediclaim is 0, default to company standard (4330), otherwise remain constant
         proj_mediclaim = Decimal('4330.0') if current_mediclaim == Decimal('0.0') else current_mediclaim
         
-        # 5. Gratuity calculation logic:
-        # Calculated dynamically as exactly 2.50% of the projected Fixed Pay (matching Excel)
-        proj_gratuity = Decimal(round(proj_fixed * Decimal('0.025')))
+        # 5. Gratuity: carry forward current value — FIXED, no recalculation during planning cycle.
+        # Business rule: only Fixed Pay, Variable Pay, and Retention Bonus are incremented.
+        # Gratuity increase is excluded from Budget Variance.
+        proj_gratuity = current_gratuity
 
         # 6. Total CTC projection sum
         proj_ctc = proj_fixed + proj_variable + proj_retention + proj_mediclaim + proj_gratuity
@@ -50,3 +51,4 @@ class CalculationEngine:
             "retention_bonus": proj_retention,
             "projected_ctc": proj_ctc
         }
+

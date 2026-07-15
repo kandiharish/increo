@@ -1,6 +1,14 @@
 import { api } from './api';
 
 export interface DashboardKPIs {
+  // New business KPIs
+  team_size: number;
+  pending_plans: number;
+  completed_plans: number;
+  planning_progress: number;
+  average_increment: number;
+  budget_variance: number;
+  // Legacy fields (used by charts)
   total_employees: number;
   current_payroll: number;
   projected_payroll: number;

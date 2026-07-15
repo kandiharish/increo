@@ -1,16 +1,24 @@
 import { api } from './api';
 
+export interface EmployeeAnalytics {
+  current_year_increment: number | null;
+  historical_average_increment: number | null;
+  team_average_increment: number | null;
+}
+
 export interface EmployeeListItem {
   id: string;
   name: string;
   department_name: string;
-  manager_name?: string;
+  manager_name: string | null;
   current_designation: string;
-  proposed_designation?: string;
+  proposed_designation: string | null;
   current_ctc: number;
   projected_ctc: number;
   planning_status: string;
-  historical_average_increment: string | number | null;
+  current_year_increment: number | null;
+  historical_average_increment: number | null;
+  team_average_increment: number | null;
 }
 
 export interface PaginatedEmployees {
@@ -122,6 +130,11 @@ export const employeeService = {
     increment_pct_retention: number;
   }): Promise<{ success: boolean; message: string; projected_ctc: number }> {
     const response = await api.post('/planning/submit', payload);
+    return response.data;
+  },
+
+  async getEmployeeAnalytics(id: string): Promise<EmployeeAnalytics> {
+    const response = await api.get<EmployeeAnalytics>(`/employees/${id}/analytics`);
     return response.data;
   },
 };

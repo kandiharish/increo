@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { employeeService } from '../../services/employees';
 import { formatCurrency } from '../../utils/format';
-import { Sliders, CheckCircle, AlertCircle, FileSpreadsheet, Lock, TrendingUp, Minus, Plus, Search, ArrowRight } from 'lucide-react';
+import { Sliders, CheckCircle, AlertCircle, FileSpreadsheet, Lock, TrendingUp, Minus, Plus, Search, ArrowRight, Activity } from 'lucide-react';
 
 // ─── Numeric Stepper Component ────────────────────────────────────────────────
 const NumericStepper = ({
@@ -178,6 +178,14 @@ export const PlanningPage: React.FC = () => {
     enabled: !!selectedEmpId,
   });
 
+  // 3. Fetch analytics for selected employee (historical avg + team avg)
+  const analyticsQuery = useQuery({
+    queryKey: ['planning-analytics', selectedEmpId],
+    queryFn: () => employeeService.getEmployeeAnalytics(selectedEmpId),
+    enabled: !!selectedEmpId,
+    staleTime: 30_000, // cache 30s — team avg changes only after save/submit
+  });
+
   // Reset on employee switch
   useEffect(() => {
     if (selectedEmpId) {
@@ -216,6 +224,7 @@ export const PlanningPage: React.FC = () => {
       setMessage({ type: 'success', text: res.message });
       setHasUnsavedChanges(false);
       employeesQuery.refetch();
+      analyticsQuery.refetch();
     },
     onError: (err: any) => {
       setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to save draft.' });
@@ -234,6 +243,7 @@ export const PlanningPage: React.FC = () => {
       setMessage({ type: 'success', text: res.message });
       setHasUnsavedChanges(false);
       employeesQuery.refetch();
+      analyticsQuery.refetch();
     },
     onError: (err: any) => {
       setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to submit.' });
@@ -276,8 +286,8 @@ export const PlanningPage: React.FC = () => {
     const projVariable = Math.round(curVariable * (1 + variablePct / 100));
     const projRetention = Math.round(curRetention * (1 + retentionPct / 100));
     const projMediclaim = curMediclaim; // CONSTANT — no increment applied
-    // Rule: Gratuity = 2.5% of projected Fixed Pay (matches Excel formula)
-    const projGratuity = Math.round(projFixed * 0.025);
+    // Rule: Gratuity is FIXED — carry forward current value, no recalculation
+    const projGratuity = curGratuity;
 
     const projCTC = projFixed + projVariable + projRetention + projMediclaim + projGratuity;
     const currentTotalCTC = Number(cur.total_ctc);
@@ -458,14 +468,60 @@ export const PlanningPage: React.FC = () => {
                       <span>{currentEmp.current_designation}</span>
                       <span className="text-slate-300">•</span>
                       <span className="font-medium text-slate-600">{currentEmp.department_name}</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="font-medium text-slate-600">
-                        Hist. Avg. Inc: {currentEmp.historical_average_increment != null && !isNaN(Number(currentEmp.historical_average_increment)) ? `${Number(currentEmp.historical_average_increment).toFixed(2)}%` : 'N/A'}
-                      </span>
                     </p>
                   </div>
                 </div>
                 <StatusBadge status={currentEmp.planning_status} />
+              </div>
+
+              {/* Decision Support Analytics */}
+              <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                  <Activity className="text-indigo-500" size={14} />
+                  <h2 className="text-sm font-bold text-slate-900">Analytics</h2>
+                  <span className="ml-auto text-[10px] text-slate-400">Informational only — read-only</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  {/* 1. Current Year Increment — live from projection */}
+                  <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-3 text-center">
+                    <span className="block text-[10px] font-semibold text-indigo-500 uppercase tracking-wider mb-2">Current Year</span>
+                    {curSalary && curSalary.total_ctc > 0 && projection ? (
+                      <span className="text-lg font-bold text-indigo-800">
+                        +{projection.growthPct.toFixed(2)}%
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-400">N/A</span>
+                    )}
+                  </div>
+
+                  {/* 2. Historical Average Increment */}
+                  <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-center">
+                    <span className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Hist. Avg.</span>
+                    {analyticsQuery.isLoading ? (
+                      <div className="h-5 w-16 bg-slate-200 rounded animate-pulse mx-auto" />
+                    ) : analyticsQuery.data?.historical_average_increment != null ? (
+                      <span className="text-lg font-bold text-slate-800">
+                        {Number(analyticsQuery.data.historical_average_increment).toFixed(2)}%
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-400">N/A</span>
+                    )}
+                  </div>
+
+                  {/* 3. Team Average Increment */}
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-center">
+                    <span className="block text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-2">Team Avg.</span>
+                    {analyticsQuery.isLoading ? (
+                      <div className="h-5 w-16 bg-emerald-100 rounded animate-pulse mx-auto" />
+                    ) : analyticsQuery.data?.team_average_increment != null ? (
+                      <span className="text-lg font-bold text-emerald-800">
+                        {Number(analyticsQuery.data.team_average_increment).toFixed(2)}%
+                      </span>
+                    ) : (
+                      <span className="text-sm font-semibold text-slate-400">N/A</span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Row 1: Controls + Impact Summary */}
@@ -499,7 +555,7 @@ export const PlanningPage: React.FC = () => {
                     {/* Rules note */}
                     <div className="text-[10px] text-slate-400 bg-slate-50 rounded-md px-3 py-2 border border-slate-100 space-y-0.5">
                       <p>• Mediclaim remains <strong>constant</strong></p>
-                      <p>• Gratuity = 2.5% of projected Fixed Pay</p>
+                      <p>• Gratuity remains <strong>constant</strong> (not recalculated)</p>
                       <p>• Max increment: 50% per component</p>
                     </div>
                   </div>
@@ -623,9 +679,10 @@ export const PlanningPage: React.FC = () => {
                     isConstant
                   />
                   <CompRow
-                    label="Gratuity (2.5% of Fixed)"
+                    label="Gratuity"
                     current={projection.curGratuity}
                     projected={projection.gratuity}
+                    isConstant
                   />
                   {/* Total row */}
                   <div className="grid grid-cols-[130px_1fr_32px_1fr] items-center gap-2 pt-3 mt-2 border-t-2 border-slate-200">
