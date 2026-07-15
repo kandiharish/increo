@@ -460,7 +460,7 @@ export const PlanningPage: React.FC = () => {
                       <span className="font-medium text-slate-600">{currentEmp.department_name}</span>
                       <span className="text-slate-300">•</span>
                       <span className="font-medium text-slate-600">
-                        Hist. Avg. Inc: {currentEmp.historical_average_increment !== null ? `${currentEmp.historical_average_increment.toFixed(2)}%` : 'N/A'}
+                        Hist. Avg. Inc: {currentEmp.historical_average_increment != null && !isNaN(Number(currentEmp.historical_average_increment)) ? `${Number(currentEmp.historical_average_increment).toFixed(2)}%` : 'N/A'}
                       </span>
                     </p>
                   </div>

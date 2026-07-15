@@ -10,7 +10,7 @@ export interface EmployeeListItem {
   current_ctc: number;
   projected_ctc: number;
   planning_status: string;
-  historical_average_increment: number | null;
+  historical_average_increment: string | number | null;
 }
 
 export interface PaginatedEmployees {
@@ -39,7 +39,7 @@ export interface EmployeeDetail {
   status: string;
   department: Department;
   manager?: Manager;
-  historical_average_increment: number | null;
+  historical_average_increment: string | number | null;
 }
 
 export interface SalaryHistoryItem {

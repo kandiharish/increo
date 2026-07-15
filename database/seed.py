@@ -4,24 +4,25 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 import bcrypt
 
 # Add backend directory to Python path so we can import app modules
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "backend"))  # pyrefly: ignore[missing-import]
 
-from app.config import settings
-from app.database.session import Base
-from app.models.role import Role
-from app.models.user import User
-from app.models.department import Department
-from app.models.employee import Employee
-from app.models.salary_history import SalaryHistory
-from app.models.current_salary import CurrentSalary
-from app.models.salary_plan import SalaryPlan
-from app.models.projected_salary import ProjectedSalary
-from app.services.calculation_engine import CalculationEngine
+from app.config import settings  # type: ignore[import]
+from app.database.session import Base  # type: ignore[import]
+from app.models.role import Role  # type: ignore[import]
+from app.models.user import User  # type: ignore[import]
+from app.models.department import Department  # type: ignore[import]
+from app.models.employee import Employee  # type: ignore[import]
+from app.models.salary_history import SalaryHistory  # type: ignore[import]
+from app.models.current_salary import CurrentSalary  # type: ignore[import]
+from app.models.salary_plan import SalaryPlan  # type: ignore[import]
+from app.models.projected_salary import ProjectedSalary  # type: ignore[import]
+from app.services.calculation_engine import CalculationEngine  # type: ignore[import]
 
 def clean_decimal(val) -> Decimal:
     """Helper to convert nan, null, or float to Decimal."""

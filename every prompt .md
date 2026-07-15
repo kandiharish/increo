@@ -1,39 +1,181 @@
-Use the employee's actual overall salary increment instead of summing the three increment percentages.
+# Final Production Deployment Verification
 
-Department Average Planned Increment should be calculated as:
+Before I deploy to Render and Vercel, perform one final verification.
 
-Overall Employee Increment %
+Do not modify anything yet.
 
-=
+Review the entire project and answer each question with PASS or FAIL.
 
-((Projected CTC - Current CTC)
+---
+
+## 1. Database
+
+Verify
+
+- DATABASE_URL is loaded only from environment variables.
+- No localhost database URLs remain in production code.
+- Neon PostgreSQL is fully compatible.
+- SQLAlchemy engine is correctly configured.
+- Connection pooling is appropriate.
+
+PASS or FAIL
+
+---
+
+## 2. Backend Startup
+
+Verify
+
+- FastAPI starts successfully.
+- No import errors.
+- No missing environment variables.
+- All routers are registered.
+- Swagger (/docs) works.
+- OpenAPI schema loads.
+
+PASS or FAIL
+
+---
+
+## 3. Authentication
+
+Verify
+
+- Login works.
+- JWT generation works.
+- JWT validation works.
+- RBAC still works.
+- SECRET_KEY comes from Render environment variables.
+- No hardcoded production secrets.
+
+PASS or FAIL
+
+---
+
+## 4. Alembic
+
+Verify
+
+- alembic.ini path is correct.
+- env.py reads DATABASE_URL.
+- "alembic upgrade head" will work on Render.
+
+PASS or FAIL
+
+---
+
+## 5. Seed Script
+
+Verify
+
+- Seed script targets Neon.
+- Excel import works.
+- No localhost dependency.
+
+PASS or FAIL
+
+---
+
+## 6. Frontend
+
+Verify
+
+- VITE_API_BASE_URL is used everywhere.
+- No hardcoded localhost API URLs remain.
+- All API requests use the environment variable.
+
+PASS or FAIL
+
+---
+
+## 7. CORS
+
+Verify
+
+- Localhost still works.
+- Vercel works.
+- Render works.
+
+PASS or FAIL
+
+---
+
+## 8. Requirements
+
+Verify
+
+requirements.txt contains every required package.
+
+No missing dependencies.
+
+PASS or FAIL
+
+---
+
+## 9. Deployment
+
+Verify the exact deployment settings.
+
+Render
+
+Root Directory
+
+Build Command
+
+Start Command
+
+Python Version
+
+Health Check
+
+Vercel
+
+Root Directory
+
+Build Command
+
+Output Directory
+
+PASS or FAIL
+
+---
+
+## 10. Migration
+
+Explain exactly what commands I must run after Render deployment.
+
+---
+
+## 11. Health Check
+
+Verify these endpoints exist and will work.
 
 /
 
-Current CTC)
+/docs
 
-×
+/openapi.json
 
-100
+/api/v1/auth/login
 
-Department Average Planned Increment
+PASS or FAIL
 
-=
+---
 
-Average of all employees' Overall Employee Increment % within that department.
+## 12. Final Approval
 
-Do not calculate:
+Finally answer only one question.
 
-Fixed % + Variable % + Retention %
+"Is this application ready to deploy to production?"
 
-because these percentages apply to different salary components with different weights and would produce misleading results.
+If NO
 
-For Historical Average Increment:
+List every remaining issue.
 
-Use consecutive available salary records sorted by financial year.
+If YES
 
-If there are gaps in years, calculate using the available consecutive records.
+Provide the deployment order.
 
-If there are fewer than two salary records, display "N/A".
+Do not make assumptions.
 
-Proceed with the remaining implementation as proposed.
+Only answer based on the current codebase.
