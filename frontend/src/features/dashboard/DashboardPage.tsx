@@ -22,7 +22,6 @@ import {
   TrendingUp,
   Activity,
   Clock,
-  AlertCircle,
   Lightbulb,
   BarChart2,
 } from 'lucide-react';
