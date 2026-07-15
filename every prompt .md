@@ -1,17 +1,18 @@
-The Vercel build is failing with the following TypeScript error:
+The deployed backend is returning a CORS preflight 400 even though BACKEND_CORS_ORIGINS is configured in Render.
 
-src/features/employees/EmployeeProfilePage.tsx(248,64):
-Property 'toFixed' does not exist on type 'string | number'.
+Please audit the FastAPI CORS configuration.
 
-Please fix this without changing application behavior.
+Check the following:
 
-Tasks:
-1. Locate the failing line.
-2. Determine whether historical_average_increment should be a number or string.
-3. If the backend returns a number, update the TypeScript interfaces to use number.
-4. If the value can be string, safely convert it using Number(...) before calling toFixed().
-5. Ensure null values display "N/A".
-6. Run TypeScript checks to confirm there are no remaining compilation errors.
-7. Search the entire project for any other `.toFixed()` calls on values typed as `string | number` and fix them as well.
+1. Is BACKEND_CORS_ORIGINS actually being loaded from the Render environment variables?
+2. Print/log the value of settings.BACKEND_CORS_ORIGINS during application startup.
+3. Verify CORSMiddleware is configured using:
+   allow_origins=settings.BACKEND_CORS_ORIGINS
+4. Verify no trailing slash normalization issues exist.
+5. Verify allow_methods includes "*".
+6. Verify allow_headers includes "*".
+7. Verify allow_credentials=True.
+8. Verify no middleware registered after CORSMiddleware overrides OPTIONS requests.
+9. Explain exactly why the browser preflight receives HTTP 400.
 
-The project must build successfully on Vercel with zero TypeScript errors.
+Do not guess. Trace the complete OPTIONS request lifecycle.
