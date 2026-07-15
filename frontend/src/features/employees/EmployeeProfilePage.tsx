@@ -244,8 +244,8 @@ export const EmployeeProfilePage: React.FC = () => {
               <div>
                 <span className="block text-[10px] text-slate-400 font-semibold uppercase">Historical Avg Increment</span>
                 <span className="mt-1 block font-semibold text-slate-900">
-                  {employee.historical_average_increment !== null
-                    ? `${employee.historical_average_increment.toFixed(2)}%`
+                  {employee.historical_average_increment !== null && employee.historical_average_increment !== undefined
+                    ? `${Number(employee.historical_average_increment).toFixed(2)}%`
                     : 'N/A'}
                 </span>
               </div>

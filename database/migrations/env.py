@@ -16,9 +16,9 @@ if config.config_file_name is not None:
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "backend")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "backend")))  # pyrefly: ignore[missing-import]
 
-from app.database.base import Base
+from app.database.base import Base  # type: ignore[import]
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -39,7 +39,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    from app.config import settings
+    from app.config import settings  # type: ignore[import]
     url = settings.DATABASE_URL
     context.configure(
         url=url,
@@ -59,7 +59,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    from app.config import settings
+    from app.config import settings  # type: ignore[import]
     alembic_config = config.get_section(config.config_ini_section, {})
     alembic_config["sqlalchemy.url"] = settings.DATABASE_URL
     connectable = engine_from_config(

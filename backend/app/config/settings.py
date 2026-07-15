@@ -1,5 +1,10 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import List
+
+# Resolve absolute path to the backend directory
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ENV_PATH = os.path.join(BACKEND_DIR, ".env")
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Increo Salary Appraisal API"
@@ -21,6 +26,7 @@ class Settings(BaseSettings):
 
     class Config:
         case_sensitive = True
-        env_file = ".env"
+        # Try local .env first, fallback to the absolute backend/.env
+        env_file = [".env", ENV_PATH]
 
 settings = Settings()
