@@ -52,3 +52,23 @@ class CalculationEngine:
             "projected_ctc": proj_ctc
         }
 
+    @staticmethod
+    def calculate_increment_metrics(current_ctc: Decimal, projected_ctc: Decimal) -> Dict[str, Any]:
+        """
+        Provides a single source of truth for all compensation analytics calculations.
+        Ensures identical calculations across Employee Workspace and Employee Details.
+        """
+        difference_amount = projected_ctc - current_ctc
+        
+        current_year_increment_percentage = None
+        if current_ctc and current_ctc > Decimal('0.0') and projected_ctc and projected_ctc > Decimal('0.0'):
+            current_year_increment_percentage = round(
+                float((difference_amount / current_ctc) * Decimal('100.0')), 2
+            )
+            
+        return {
+            "current_ctc": current_ctc,
+            "projected_ctc": projected_ctc,
+            "difference_amount": difference_amount,
+            "current_year_increment_percentage": current_year_increment_percentage
+        }

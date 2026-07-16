@@ -2,13 +2,31 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.schemas.planning import PlanningSaveRequest, CalculationRequest, CalculationResponse
+from app.schemas.planning import PlanningSaveRequest, CalculationRequest, CalculationResponse, PlanningPlanResponse
 from app.services.planning_service import PlanningService
 from app.services.calculation_engine import CalculationEngine
 from app.api.v1.dependencies import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/planning", tags=["planning"])
+
+@router.get("/{employee_id}", response_model=PlanningPlanResponse)
+def get_planning(
+    employee_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get existing salary plan for an employee.
+    """
+    service = PlanningService(db)
+    plan = service.planning_repo.get_plan_by_employee_id(employee_id)
+    if not plan:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    # Verify manager access
+    if current_user.role.name == "Manager" and plan.manager_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return plan
 
 @router.post("/save")
 def save_planning(

@@ -7,6 +7,7 @@ from app.models.current_salary import CurrentSalary
 from app.models.projected_salary import ProjectedSalary
 from typing import Optional, List, Dict, Any, Tuple
 from decimal import Decimal
+from app.services.calculation_engine import CalculationEngine
 
 class EmployeeService:
     def __init__(self, db: Session):
@@ -24,9 +25,10 @@ class EmployeeService:
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Retrieves a paginated and formatted list of employees.
+        Retrieves a paginated and formatted list of employees.
         Enforces manager reporting scoping.
         Includes three analytics columns: current_year_increment, historical_average_increment,
-        and team_average_increment — all computed without N+1 queries.
+        and department_average_increment — all computed without N+1 queries.
         """
         # If user is a Manager, override manager filter with the user's ID
         # to restrict query results to their reportees
@@ -44,9 +46,9 @@ class EmployeeService:
             designation=designation,
         )
 
-        # ── Team Average Increment ────────────────────────────────────────────
-        # Pre-compute in ONE SQL aggregate before the employee loop (avoids N+1).
-        # Scope: same manager filter as the employee list.
+        # ── Department Average Increment ─────────────────────────────────────
+        # Pre-compute in ONE SQL aggregate grouped by department before the employee loop (avoids N+1).
+        # Irrespective of the reporting manager.
         # Formula: AVG( ((projected_ctc - current_ctc) / current_ctc) * 100 )
         db = self.employee_repo.db
         current_ctc_expr = (
@@ -56,7 +58,8 @@ class EmployeeService:
             CurrentSalary.gratuity +
             CurrentSalary.retention_bonus
         )
-        team_avg_query = db.query(
+        dept_avg_query = db.query(
+            Employee.department_id,
             func.avg(
                 case(
                     (
@@ -65,15 +68,18 @@ class EmployeeService:
                     ),
                     else_=None
                 )
-            )
+            ).label("avg_inc")
         ).select_from(Employee)\
          .join(CurrentSalary, CurrentSalary.employee_id == Employee.id)\
          .join(ProjectedSalary, ProjectedSalary.employee_id == Employee.id)\
-         .filter(Employee.status == "Active")
-        if active_manager_id is not None:
-            team_avg_query = team_avg_query.filter(Employee.manager_id == active_manager_id)
-        team_avg_scalar = team_avg_query.scalar()
-        team_average_increment = round(float(team_avg_scalar), 2) if team_avg_scalar is not None else None
+         .filter(Employee.status == "Active")\
+         .group_by(Employee.department_id)
+
+        dept_avg_results = dept_avg_query.all()
+        dept_avg_dict = {
+            row.department_id: round(float(row.avg_inc), 2) if row.avg_inc is not None else None
+            for row in dept_avg_results
+        }
         # ─────────────────────────────────────────────────────────────────────
 
         formatted_items = []
@@ -95,11 +101,8 @@ class EmployeeService:
                 planning_status = emp.planning_inputs[0].status if len(emp.planning_inputs) > 0 else "Not Started"
 
             # 4. Current Year Increment % = ((projected - current) / current) * 100
-            current_year_increment = None
-            if current_ctc and current_ctc > 0 and projected_ctc and projected_ctc > 0:
-                current_year_increment = round(
-                    float(((projected_ctc - current_ctc) / current_ctc) * 100), 2
-                )
+            metrics = CalculationEngine.calculate_increment_metrics(current_ctc, projected_ctc)
+            current_year_increment = metrics["current_year_increment_percentage"]
 
             # 5. Historical Average Increment (already joined via salary_history eager load)
             historical_average_increment = None
@@ -114,6 +117,7 @@ class EmployeeService:
                         increments.append(inc_pct)
                 if increments:
                     historical_average_increment = round(sum(increments) / len(increments), 2)
+            department_average_increment = dept_avg_dict.get(emp.department_id)
 
             formatted_items.append({
                 "id": emp.id,
@@ -127,7 +131,7 @@ class EmployeeService:
                 "planning_status": planning_status,
                 "current_year_increment": current_year_increment,
                 "historical_average_increment": historical_average_increment,
-                "team_average_increment": team_average_increment,
+                "department_average_increment": department_average_increment,
             })
 
         return formatted_items, total

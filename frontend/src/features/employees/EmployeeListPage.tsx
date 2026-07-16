@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { usePlanning } from '../../contexts/PlanningContext';
 import { employeeService } from '../../services/employees';
+import { departmentsService } from '../../services/departments';
 import { formatCurrency } from '../../utils/format';
 import { SlidersHorizontal, UserCheck, X, Eye, Calculator, History, Search } from 'lucide-react';
 
@@ -33,6 +34,11 @@ export const EmployeeListPage: React.FC = () => {
         departmentId,
         designation,
       }),
+  });
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsService.getDepartments(),
   });
 
   const getStatusBadgeStyle = (status: string) => {
@@ -126,14 +132,11 @@ export const EmployeeListPage: React.FC = () => {
                 className="mt-1.5 block w-full rounded-md border border-[#cbd5e1] bg-slate-50 px-3 py-1.5 text-xs text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none"
               >
                 <option value="">All Departments</option>
-                <option value="1">Engineering</option>
-                <option value="2">Human Resources</option>
-                <option value="3">Finance</option>
-                <option value="4">Operations</option>
-                <option value="5">Sales</option>
-                <option value="6">Marketing</option>
-                <option value="7">Information Technology</option>
-                <option value="8">Legal</option>
+                {departments?.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -210,7 +213,7 @@ export const EmployeeListPage: React.FC = () => {
                     <th className="px-5 py-3">Designation</th>
                     <th className="px-4 py-3 text-right text-indigo-600">Curr. Yr %</th>
                     <th className="px-4 py-3 text-right text-slate-500">Hist. Avg %</th>
-                    <th className="px-4 py-3 text-right text-emerald-600">Team Avg %</th>
+                    <th className="px-4 py-3 text-right text-emerald-600">Dept Avg %</th>
                     <th className="px-5 py-3 text-right">Current CTC</th>
                     <th className="px-5 py-3 text-right">Projected CTC</th>
                     <th className="px-5 py-3 text-center">Status</th>
@@ -232,17 +235,17 @@ export const EmployeeListPage: React.FC = () => {
                       <td className="px-4 py-3.5 text-right">
                         {emp.current_year_increment != null
                           ? <span className="font-bold text-indigo-700 font-mono">+{Number(emp.current_year_increment).toFixed(2)}%</span>
-                          : <span className="text-slate-300">—</span>}
+                          : <span className="text-slate-400 font-medium">N/A</span>}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         {emp.historical_average_increment != null
                           ? <span className="font-medium text-slate-700 font-mono">{Number(emp.historical_average_increment).toFixed(2)}%</span>
-                          : <span className="text-slate-300">—</span>}
+                          : <span className="text-slate-400 font-medium">N/A</span>}
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        {emp.team_average_increment != null
-                          ? <span className="font-medium text-emerald-700 font-mono">{Number(emp.team_average_increment).toFixed(2)}%</span>
-                          : <span className="text-slate-300">—</span>}
+                        {emp.department_average_increment != null
+                          ? <span className="font-medium text-emerald-700 font-mono">{Number(emp.department_average_increment).toFixed(2)}%</span>
+                          : <span className="text-slate-400 font-medium">N/A</span>}
                       </td>
                       <td className="px-5 py-3.5 text-right font-medium text-slate-700">{formatCurrency(emp.current_ctc)}</td>
                       <td className="px-5 py-3.5 text-right font-semibold text-indigo-900">

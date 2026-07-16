@@ -11,7 +11,7 @@ class ReportRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_department_payroll_summary(self, manager_id: int = None) -> List[Dict[str, Any]]:
+    def get_department_payroll_summary(self, manager_id: int = None, department_id: int = None) -> List[Dict[str, Any]]:
         """
         Returns a summary list of department stats: (name, count, current, projected).
         """
@@ -47,6 +47,8 @@ class ReportRepository:
 
         if manager_id is not None:
             query = query.filter(Employee.manager_id == manager_id)
+        if department_id is not None:
+            query = query.filter(Employee.department_id == department_id)
 
         rows = query.group_by(Department.name).all()
 

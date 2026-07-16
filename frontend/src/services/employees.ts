@@ -3,7 +3,15 @@ import { api } from './api';
 export interface EmployeeAnalytics {
   current_year_increment: number | null;
   historical_average_increment: number | null;
-  team_average_increment: number | null;
+  department_average_increment: number | null;
+}
+
+export interface EmployeePlan {
+  employee_id: string;
+  increment_pct_fixed: number;
+  increment_pct_variable: number;
+  increment_pct_retention: number;
+  status: string;
 }
 
 export interface EmployeeListItem {
@@ -18,7 +26,7 @@ export interface EmployeeListItem {
   planning_status: string;
   current_year_increment: number | null;
   historical_average_increment: number | null;
-  team_average_increment: number | null;
+  department_average_increment: number | null;
 }
 
 export interface PaginatedEmployees {
@@ -136,5 +144,15 @@ export const employeeService = {
   async getEmployeeAnalytics(id: string): Promise<EmployeeAnalytics> {
     const response = await api.get<EmployeeAnalytics>(`/employees/${id}/analytics`);
     return response.data;
+  },
+
+  async getEmployeePlan(id: string): Promise<EmployeePlan | null> {
+    try {
+      const response = await api.get<EmployeePlan>(`/planning/${id}`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) return null;
+      throw error;
+    }
   },
 };

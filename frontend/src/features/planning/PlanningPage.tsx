@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { employeeService } from '../../services/employees';
@@ -178,29 +178,58 @@ export const PlanningPage: React.FC = () => {
     enabled: !!selectedEmpId,
   });
 
-  // 3. Fetch analytics for selected employee (historical avg + team avg)
+  // 3. Fetch analytics for selected employee (historical avg + dept avg)
   const analyticsQuery = useQuery({
     queryKey: ['planning-analytics', selectedEmpId],
     queryFn: () => employeeService.getEmployeeAnalytics(selectedEmpId),
     enabled: !!selectedEmpId,
-    staleTime: 30_000, // cache 30s — team avg changes only after save/submit
+    staleTime: 30_000, // cache 30s — dept avg changes only after save/submit
   });
 
-  // Reset on employee switch
+  // 4. Fetch existing plan for selected employee
+  const planQuery = useQuery({
+    queryKey: ['planning-plan', selectedEmpId],
+    queryFn: () => employeeService.getEmployeePlan(selectedEmpId),
+    enabled: !!selectedEmpId,
+  });
+
+  // Initialize sliders from plan and reset on employee switch
   useEffect(() => {
-    if (selectedEmpId) {
+    if (planQuery.isLoading) {
       setFixedPct(0);
       setVariablePct(0);
       setRetentionPct(0);
-      setMessage(null);
       setHasUnsavedChanges(false);
+      setMessage(null);
+    } else if (planQuery.isSuccess) {
+      if (planQuery.data) {
+        setFixedPct(Number(planQuery.data.increment_pct_fixed));
+        setVariablePct(Number(planQuery.data.increment_pct_variable));
+        setRetentionPct(Number(planQuery.data.increment_pct_retention));
+      } else {
+        setFixedPct(0);
+        setVariablePct(0);
+        setRetentionPct(0);
+      }
+      setHasUnsavedChanges(false);
+      setMessage(null);
     }
-  }, [selectedEmpId]);
+  }, [planQuery.data, planQuery.isSuccess, planQuery.isLoading, selectedEmpId]);
 
   // Track dirty state
   useEffect(() => {
-    setHasUnsavedChanges(fixedPct !== 0 || variablePct !== 0 || retentionPct !== 0);
-  }, [fixedPct, variablePct, retentionPct]);
+    if (planQuery.isSuccess) {
+      if (planQuery.data) {
+        setHasUnsavedChanges(
+          fixedPct !== Number(planQuery.data.increment_pct_fixed) ||
+          variablePct !== Number(planQuery.data.increment_pct_variable) ||
+          retentionPct !== Number(planQuery.data.increment_pct_retention)
+        );
+      } else {
+        setHasUnsavedChanges(fixedPct !== 0 || variablePct !== 0 || retentionPct !== 0);
+      }
+    }
+  }, [fixedPct, variablePct, retentionPct, planQuery.data, planQuery.isSuccess]);
 
   // Warn on browser navigation
   useEffect(() => {
@@ -261,7 +290,14 @@ export const PlanningPage: React.FC = () => {
   };
 
   const handleReset = () => {
-    setFixedPct(0); setVariablePct(0); setRetentionPct(0); setMessage(null);
+    if (planQuery.data) {
+      setFixedPct(Number(planQuery.data.increment_pct_fixed));
+      setVariablePct(Number(planQuery.data.increment_pct_variable));
+      setRetentionPct(Number(planQuery.data.increment_pct_retention));
+    } else {
+      setFixedPct(0); setVariablePct(0); setRetentionPct(0);
+    }
+    setMessage(null);
   };
 
   const handleSelectEmployee = (empId: string) => {
@@ -269,47 +305,71 @@ export const PlanningPage: React.FC = () => {
     setSelectedEmpId(empId);
   };
 
-  // Live projection using SAME rules as backend CalculationEngine
-  const projection = useCallback(() => {
+  // Live projection using backend /planning/calculate
+  const [projection, setProjection] = useState<any>(null);
+
+  useEffect(() => {
     const cur = currentSalaryQuery.data;
-    if (!cur) return null;
-
-    const curFixed = Number(cur.fixed_pay);
-    const curVariable = Number(cur.variable_pay);
-    const curRetention = Number(cur.retention_bonus);
-    // Rule: Mediclaim stays constant; if 0, default to company standard 4330
-    const curMediclaim = Number(cur.mediclaim) === 0 ? 4330 : Number(cur.mediclaim);
-    const curGratuity = Number(cur.gratuity);
-
-    // Rule: Fixed/Variable/Retention apply increment %; Mediclaim is constant
-    const projFixed = Math.round(curFixed * (1 + fixedPct / 100));
-    const projVariable = Math.round(curVariable * (1 + variablePct / 100));
-    const projRetention = Math.round(curRetention * (1 + retentionPct / 100));
-    const projMediclaim = curMediclaim; // CONSTANT — no increment applied
-    // Rule: Gratuity is FIXED — carry forward current value, no recalculation
-    const projGratuity = curGratuity;
-
-    const projCTC = projFixed + projVariable + projRetention + projMediclaim + projGratuity;
+    if (!cur || !selectedEmpId) {
+      setProjection(null);
+      return;
+    }
+    
+    // Call backend API for live projection calculation
     const currentTotalCTC = Number(cur.total_ctc);
-    const diff = projCTC - currentTotalCTC;
-    const growthPct = currentTotalCTC > 0 ? (diff / currentTotalCTC) * 100 : 0;
-
-    return {
-      fixed: projFixed,
-      variable: projVariable,
-      retention: projRetention,
-      mediclaim: projMediclaim,
-      gratuity: projGratuity,
-      ctc: projCTC,
-      diff,
-      growthPct: isNaN(growthPct) ? 0 : growthPct,
-      curFixed,
-      curVariable,
-      curRetention,
-      curMediclaim,
-      curGratuity,
+    
+    const fetchProjection = async () => {
+      try {
+        const res = await fetch('http://localhost:8000/api/v1/planning/calculate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            current_fixed: cur.fixed_pay,
+            current_variable: cur.variable_pay,
+            current_mediclaim: cur.mediclaim,
+            current_gratuity: cur.gratuity,
+            current_retention: cur.retention_bonus,
+            increment_pct_fixed: fixedPct,
+            increment_pct_variable: variablePct,
+            increment_pct_retention: retentionPct
+          })
+        });
+        const data = await res.json();
+        
+        const projCTC = Number(data.projected_ctc);
+        const diff = projCTC - currentTotalCTC;
+        const growthPct = currentTotalCTC > 0 ? (diff / currentTotalCTC) * 100 : 0;
+        
+        setProjection({
+          fixed: Number(data.fixed_pay),
+          variable: Number(data.variable_pay),
+          retention: Number(data.retention_bonus),
+          mediclaim: Number(data.mediclaim),
+          gratuity: Number(data.gratuity),
+          ctc: projCTC,
+          diff,
+          growthPct: isNaN(growthPct) ? 0 : growthPct,
+          curFixed: Number(cur.fixed_pay),
+          curVariable: Number(cur.variable_pay),
+          curRetention: Number(cur.retention_bonus),
+          curMediclaim: Number(cur.mediclaim),
+          curGratuity: Number(cur.gratuity),
+        });
+      } catch (err) {
+        console.error("Failed to fetch live projection", err);
+      }
     };
-  }, [currentSalaryQuery.data, fixedPct, variablePct, retentionPct])();
+    
+    // Debounce to prevent spamming backend while sliding
+    const timer = setTimeout(() => {
+      fetchProjection();
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [currentSalaryQuery.data, fixedPct, variablePct, retentionPct, selectedEmpId]);
 
   const currentEmp = employeesQuery.data?.items.find((e) => e.id === selectedEmpId);
   const curSalary = currentSalaryQuery.data;
@@ -508,14 +568,14 @@ export const PlanningPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 3. Team Average Increment */}
+                  {/* 3. Department Average Increment */}
                   <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 text-center">
-                    <span className="block text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-2">Team Avg.</span>
+                    <span className="block text-[10px] font-semibold text-emerald-600 uppercase tracking-wider mb-2">Dept Avg.</span>
                     {analyticsQuery.isLoading ? (
                       <div className="h-5 w-16 bg-emerald-100 rounded animate-pulse mx-auto" />
-                    ) : analyticsQuery.data?.team_average_increment != null ? (
+                    ) : analyticsQuery.data?.department_average_increment != null ? (
                       <span className="text-lg font-bold text-emerald-800">
-                        {Number(analyticsQuery.data.team_average_increment).toFixed(2)}%
+                        {Number(analyticsQuery.data.department_average_increment).toFixed(2)}%
                       </span>
                     ) : (
                       <span className="text-sm font-semibold text-slate-400">N/A</span>

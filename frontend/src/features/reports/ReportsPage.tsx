@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '../../services/reports';
+import { departmentsService } from '../../services/departments';
 import { formatCurrency } from '../../utils/format';
 import { Download, Printer, FileText, TrendingUp, Users, DollarSign, Lightbulb } from 'lucide-react';
 import {
@@ -26,6 +27,12 @@ export const ReportsPage: React.FC = () => {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reports-summary', departmentId],
     queryFn: () => reportsService.getReportsSummary(departmentId),
+  });
+
+  // Fetch departments data
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => departmentsService.getDepartments(),
   });
 
   const handlePrint = () => {
@@ -174,14 +181,11 @@ export const ReportsPage: React.FC = () => {
           className="block w-64 rounded-md border border-[#cbd5e1] bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-indigo-600 focus:bg-white focus:outline-none"
         >
           <option value="">All Departments</option>
-          <option value="1">Engineering</option>
-          <option value="2">Human Resources</option>
-          <option value="3">Finance</option>
-          <option value="4">Operations</option>
-          <option value="5">Sales</option>
-          <option value="6">Marketing</option>
-          <option value="7">Information Technology</option>
-          <option value="8">Legal</option>
+          {departments?.map((dept) => (
+            <option key={dept.id} value={dept.id}>
+              {dept.name}
+            </option>
+          ))}
         </select>
       </div>
 

@@ -14,7 +14,7 @@ class ReportService:
         """
         manager_id = current_user.id if current_user.role.name == "Manager" else None
 
-        departments = self.report_repo.get_department_payroll_summary(manager_id)
+        departments = self.report_repo.get_department_payroll_summary(manager_id, department_id)
         records = self.report_repo.get_increment_report_data(manager_id, department_id)
 
         return {

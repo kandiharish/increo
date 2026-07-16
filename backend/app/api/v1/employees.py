@@ -166,8 +166,8 @@ def get_employee_analytics(
     Returns decision-support analytics for a single employee in the planning screen:
     - current_year_increment: live ((projected - current) / current) * 100
     - historical_average_increment: average YoY % from salary_history
-    - team_average_increment: average planned increment across the manager's visible team
-    RBAC: Managers are scoped to their own team; HR and Director see org-wide team averages.
+    - department_average_increment: average planned increment across the employee's department
+    RBAC: Managers are scoped to their own team; HR and Director see org-wide.
     """
     # Enforce scope: manager cannot query analytics for another manager's employee
     service = EmployeeService(db)

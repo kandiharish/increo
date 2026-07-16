@@ -29,7 +29,7 @@ class EmployeeListItem(BaseModel):
     planning_status: str
     current_year_increment: Optional[Decimal] = None
     historical_average_increment: Optional[Decimal] = None
-    team_average_increment: Optional[Decimal] = None
+    department_average_increment: Optional[Decimal] = None
 
 class PaginatedEmployeeResponse(BaseModel):
     items: List[EmployeeListItem]

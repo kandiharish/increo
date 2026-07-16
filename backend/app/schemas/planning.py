@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
 class PlanningSaveRequest(BaseModel):
@@ -24,3 +24,11 @@ class CalculationResponse(BaseModel):
     gratuity: Decimal
     retention_bonus: Decimal
     projected_ctc: Decimal
+
+class PlanningPlanResponse(BaseModel):
+    employee_id: str
+    increment_pct_fixed: Decimal
+    increment_pct_variable: Decimal
+    increment_pct_retention: Decimal
+    status: str
+    model_config = ConfigDict(from_attributes=True)
