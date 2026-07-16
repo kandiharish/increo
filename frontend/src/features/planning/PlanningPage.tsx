@@ -505,26 +505,7 @@ export const PlanningPage: React.FC = () => {
 
         {/* ── Right Panel: Planning Workspace ── */}
         <div className="lg:col-span-3">
-          {(!currentEmp || !curSalary || !projection) ? (
-            <div className="flex flex-col items-center justify-center h-[600px] text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              {currentEmp ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
-                  <h3 className="text-sm font-semibold text-slate-600">Loading projection data...</h3>
-                </div>
-              ) : (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-4 shadow-sm border border-slate-100">
-                    <Sliders size={24} className="text-slate-300" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-700">Select an employee to begin</h3>
-                  <p className="text-sm text-slate-500 mt-2 max-w-sm">
-                    Pick a team member from the directory panel on the left to model their compensation increments.
-                  </p>
-                </>
-              )}
-            </div>
-          ) : (
+          {currentEmp && curSalary && projection ? (
             <div className="space-y-5">
 
               {/* Employee Header Card */}
@@ -776,15 +757,24 @@ export const PlanningPage: React.FC = () => {
 
             </div>
           ) : (
-            /* Empty state */
+            /* Empty state / Loading state */
             <div className="flex h-full min-h-[500px] flex-col items-center justify-center p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-              <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-4 text-slate-300">
-                <Sliders size={22} />
-              </div>
-              <p className="text-sm font-bold text-slate-700">Select an employee to begin</p>
-              <p className="text-xs text-slate-500 mt-1.5 max-w-xs">
-                Pick a team member from the directory panel on the left to model their compensation increments.
-              </p>
+              {currentEmp ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
+                  <h3 className="text-sm font-semibold text-slate-600">Loading projection data...</h3>
+                </div>
+              ) : (
+                <>
+                  <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100 mb-4 text-slate-300">
+                    <Sliders size={22} />
+                  </div>
+                  <p className="text-sm font-bold text-slate-700">Select an employee to begin</p>
+                  <p className="text-xs text-slate-500 mt-1.5 max-w-xs">
+                    Pick a team member from the directory panel on the left to model their compensation increments.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
