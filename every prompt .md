@@ -1,176 +1,213 @@
-# Bug Fix: Planning Page Should Always Stay in Sync with Saved Employee Data
+# Fix Business Logic: Variable Pay and Retention Bonus Are Not Reflected in Compensation Breakdown
 
 ## Problem
 
-The Planning page currently displays unsaved local edits after switching employees.
+Currently, the application allows managers to modify:
 
-Example
+- Fixed Salary %
+- Variable Pay %
+- Retention Bonus %
 
-Employee Workspace
+However, only the Fixed Salary increment affects the calculations.
 
-Current Year
-14.16%
+Example:
 
-Planning Page
+Input:
+- Fixed Salary = 1.50%
+- Variable Pay = 1.50%
+- Retention Bonus = 1.00%
 
-Initially
-14.16%
+Current Output:
 
-User changes Fixed Pay and Variable Pay to 0%
+Fixed Pay
+₹31,33,680 → ₹31,80,685 ✅
 
-Planning Preview
+Variable Pay
+₹0 → ₹0 ❌
 
-0%
+Retention Bonus
+₹0 → ₹0 ❌
 
-User switches employee.
+Difference Amount
+Calculated only from Fixed Pay
 
-Returns to the same employee.
-
-Planning page still shows
-
-0%
-
-Employee Workspace still shows
-
-14.16%
-
-This creates inconsistent data across the application.
+This creates a confusing user experience because the manager expects every editable field to influence the projected compensation.
 
 ---
 
-## Required Behaviour
+# Required Behaviour
 
-The application must distinguish between
+The system must implement one of the following business rules consistently.
 
-1. Saved data
-2. Unsaved preview
+## Case 1 (Preferred)
 
-Only the preview should change while editing.
+If Variable Pay and Retention Bonus are configurable compensation components, they must participate in the projected salary calculation.
 
-The saved values must remain unchanged until the manager explicitly saves.
+When a manager updates:
 
----
+- Fixed Salary %
+- Variable Pay %
+- Retention Bonus %
 
-## Rules
+the following must update immediately:
 
-### Initial Load
+- Projected Variable Pay
+- Projected Retention Bonus
+- Projected CTC
+- Difference Amount
+- Current Year Increment %
+- Budget Variance
+- Reports
+- Dashboard
+- Payroll calculations
 
-When an employee is selected,
+The Compensation Breakdown should clearly display:
 
-always load
+Current Variable Pay
+↓
 
-- current increment
-- projected salary
-- difference amount
-- projected CTC
+Projected Variable Pay
 
-from the backend.
+Current Retention Bonus
+↓
 
-Do not initialize from stale React state.
+Projected Retention Bonus
 
----
-
-### Editing
-
-Changing
-
-- Fixed Pay
-- Variable Pay
-- Retention Bonus
-
-should only update the preview panel.
-
-This is temporary.
-
-Do not overwrite the saved employee data.
+instead of remaining zero.
 
 ---
 
-### Switching Employee
+## Case 2
 
-If unsaved edits exist,
+If an employee is NOT eligible for Variable Pay or Retention Bonus, the UI should NOT allow editing.
 
-show the confirmation dialog.
+Instead:
 
-If the manager chooses
+- Disable the controls
+- Show them as read-only
+- Display an informational tooltip or badge such as
 
-Discard Changes
+"Not applicable for this employee"
 
-then
+or
 
-1. Clear all temporary planning state.
-2. Reload the selected employee from the backend.
-3. Recalculate analytics from saved values.
+"Employee is not eligible for Variable Pay"
 
-The Planning page must exactly match the Employee Workspace.
+This prevents managers from entering values that have no effect.
 
 ---
 
-### Save Draft
+# Backend Verification
 
-After Save Draft
+Review the calculation service responsible for projected compensation.
 
-Persist values.
+Verify that:
 
-Reload employee.
+Projected Variable Pay
 
-Employee Workspace
+is calculated from the configured percentage.
 
-Planning
+Verify that:
 
-Dashboard
+Projected Retention Bonus
+
+is calculated from the configured percentage.
+
+Ensure both values contribute to:
+
+Projected CTC
+
+Difference Amount
+
+Current Year Increment
+
+Budget Variance
+
+Department Payroll
 
 Reports
 
-must all show identical numbers.
+Dashboard Analytics
 
 ---
 
-### Submit Final
+# Compensation Breakdown
 
-After Submit Final
+Current
 
-Persist values.
+Current Variable Pay
 
-Reload employee.
+₹0 → ₹0
 
-Refresh all derived calculations.
+Current Retention Bonus
 
-Every screen must show the same values.
+₹0 → ₹0
+
+Required
+
+If applicable:
+
+Variable Pay
+
+₹50,000 → ₹57,500
+
+Retention Bonus
+
+₹25,000 → ₹27,500
+
+If not applicable:
+
+Display
+
+Not Applicable
+
+instead of editable inputs.
 
 ---
 
-## Source of Truth
+# Financial Impact
 
-Never keep projection values only in React state.
+The Financial Impact card must include every editable compensation component.
 
-Always reload after
+Projected CTC should equal
 
-- Save Draft
-- Submit Final
-- Employee Switch
-- Refresh
+Current Fixed
++ Incremented Fixed
 
-using backend data.
++
+
+Current Variable
++ Incremented Variable
+
++
+
+Current Retention Bonus
++ Incremented Retention Bonus
+
++
+
+Mediclaim
+
++
+
+Gratuity (if business rule says fixed)
+
+Difference Amount must equal
+
+Projected CTC − Current CTC
+
+Current Year Increment % must be derived from the final projected CTC.
 
 ---
 
-## Acceptance Criteria
+# Acceptance Criteria
 
-For every employee,
+- Fixed Salary affects projected salary.
+- Variable Pay affects projected salary.
+- Retention Bonus affects projected salary.
+- Compensation Breakdown reflects all updated values.
+- Financial Impact updates correctly.
+- Dashboard and Reports remain consistent.
+- If an employee is not eligible for Variable Pay or Retention Bonus, those controls are disabled or clearly marked as "Not Applicable" instead of accepting input with no effect.
 
-Current Year %
-
-must always be identical across
-
-- Employee Workspace
-- Planning Page
-- Reports
-- Dashboard
-- Backend API
-
-Changing sliders must only affect the temporary preview.
-
-Actual values should change only after Save Draft or Submit Final.
-
-No stale local state should survive employee switches.
+The application should never allow managers to enter editable values that do not influence the calculations without clearly explaining why.
