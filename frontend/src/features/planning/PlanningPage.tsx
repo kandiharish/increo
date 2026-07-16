@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { employeeService } from '../../services/employees';
+import { api } from '../../services/api';
 import { formatCurrency } from '../../utils/format';
-import { Sliders, CheckCircle, AlertCircle, FileSpreadsheet, Lock, TrendingUp, Minus, Plus, Search, ArrowRight, Activity } from 'lucide-react';
+import { Sliders, CheckCircle, AlertCircle, FileSpreadsheet, Lock, TrendingUp, Minus, Plus, Search, ArrowRight, Activity, Loader2 } from 'lucide-react';
 
 // ─── Numeric Stepper Component ────────────────────────────────────────────────
 const NumericStepper = ({
@@ -320,24 +321,17 @@ export const PlanningPage: React.FC = () => {
     
     const fetchProjection = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/v1/planning/calculate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: JSON.stringify({
-            current_fixed: cur.fixed_pay,
-            current_variable: cur.variable_pay,
-            current_mediclaim: cur.mediclaim,
-            current_gratuity: cur.gratuity,
-            current_retention: cur.retention_bonus,
-            increment_pct_fixed: fixedPct,
-            increment_pct_variable: variablePct,
-            increment_pct_retention: retentionPct
-          })
+        const res = await api.post('/planning/calculate', {
+          current_fixed: cur.fixed_pay,
+          current_variable: cur.variable_pay,
+          current_mediclaim: cur.mediclaim,
+          current_gratuity: cur.gratuity,
+          current_retention: cur.retention_bonus,
+          increment_pct_fixed: fixedPct,
+          increment_pct_variable: variablePct,
+          increment_pct_retention: retentionPct
         });
-        const data = await res.json();
+        const data = res.data;
         
         const projCTC = Number(data.projected_ctc);
         const diff = projCTC - currentTotalCTC;
@@ -511,7 +505,26 @@ export const PlanningPage: React.FC = () => {
 
         {/* ── Right Panel: Planning Workspace ── */}
         <div className="lg:col-span-3">
-          {currentEmp && curSalary && projection ? (
+          {(!currentEmp || !curSalary || !projection) ? (
+            <div className="flex flex-col items-center justify-center h-[600px] text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+              {currentEmp ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
+                  <h3 className="text-sm font-semibold text-slate-600">Loading projection data...</h3>
+                </div>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center mb-4 shadow-sm border border-slate-100">
+                    <Sliders size={24} className="text-slate-300" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-700">Select an employee to begin</h3>
+                  <p className="text-sm text-slate-500 mt-2 max-w-sm">
+                    Pick a team member from the directory panel on the left to model their compensation increments.
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
             <div className="space-y-5">
 
               {/* Employee Header Card */}
