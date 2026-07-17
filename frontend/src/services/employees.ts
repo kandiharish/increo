@@ -88,6 +88,9 @@ export const employeeService = {
     search?: string;
     departmentId?: number;
     designation?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    highlight?: string[];
   }): Promise<PaginatedEmployees> {
     const response = await api.get<PaginatedEmployees>('/employees', {
       params: {
@@ -96,6 +99,10 @@ export const employeeService = {
         search: params.search || undefined,
         department_id: params.departmentId || undefined,
         designation: params.designation || undefined,
+        sort_by: params.sortBy || undefined,
+        sort_order: params.sortOrder || undefined,
+        // serialize the array for FastAPI as repeated parameters: highlight=abc&highlight=xyz
+        highlight: params.highlight?.length ? params.highlight : undefined,
       },
     });
     return response.data;

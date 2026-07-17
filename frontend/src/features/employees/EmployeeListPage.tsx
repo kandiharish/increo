@@ -18,14 +18,19 @@ export const EmployeeListPage: React.FC = () => {
   const [designation, setDesignation] = useState<string>('');
   const [planningStatus, setPlanningStatus] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Advanced filters state
+  const [sortBy, setSortBy] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [highlights, setHighlights] = useState<string[]>([]);
 
   // Reset to page 1 if query or backend-filters change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, departmentId, designation]);
+  }, [searchQuery, departmentId, designation, sortBy, sortOrder, highlights]);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['employees', page, limit, searchQuery, departmentId, designation],
+    queryKey: ['employees', page, limit, searchQuery, departmentId, designation, sortBy, sortOrder, highlights],
     queryFn: () =>
       employeeService.getEmployees({
         page,
@@ -33,6 +38,9 @@ export const EmployeeListPage: React.FC = () => {
         search: searchQuery,
         departmentId,
         designation,
+        sortBy: sortBy || undefined,
+        sortOrder: sortBy ? sortOrder : undefined,
+        highlight: highlights.length > 0 ? highlights : undefined,
       }),
   });
 
@@ -57,6 +65,17 @@ export const EmployeeListPage: React.FC = () => {
     setDepartmentId(undefined);
     setDesignation('');
     setPlanningStatus('');
+    setSortBy('');
+    setSortOrder('desc');
+    setHighlights([]);
+  };
+
+  const toggleHighlight = (value: string) => {
+    setHighlights(prev => 
+      prev.includes(value) 
+        ? prev.filter(h => h !== value)
+        : [...prev, value]
+    );
   };
 
   // Client-side filter for planning status (to avoid modifying backend API)
@@ -92,16 +111,16 @@ export const EmployeeListPage: React.FC = () => {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${
-              showFilters || departmentId || designation || planningStatus
+              showFilters || departmentId || designation || planningStatus || sortBy || highlights.length > 0
                 ? 'border-indigo-600 bg-indigo-50 text-indigo-600'
                 : 'border-[#cbd5e1] bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >
             <SlidersHorizontal size={14} />
             {showFilters ? 'Hide Filters' : 'Filters'}
-            {(departmentId || designation || planningStatus) && (
+            {(departmentId || designation || planningStatus || sortBy || highlights.length > 0) && (
               <span className="ml-1 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] text-white">
-                {(departmentId ? 1 : 0) + (designation ? 1 : 0) + (planningStatus ? 1 : 0)}
+                {(departmentId ? 1 : 0) + (designation ? 1 : 0) + (planningStatus ? 1 : 0) + (sortBy ? 1 : 0) + highlights.length}
               </span>
             )}
           </button>
@@ -167,6 +186,70 @@ export const EmployeeListPage: React.FC = () => {
                 <option value="In Progress">In Progress</option>
                 <option value="Completed">Completed</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+            {/* Sort By Section */}
+            <div>
+              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Sort By</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+                {[
+                  { value: '', order: 'desc', label: 'Default' },
+                  { value: 'current_year_increment', order: 'desc', label: 'Highest Current Year Increment' },
+                  { value: 'current_year_increment', order: 'asc', label: 'Lowest Current Year Increment' },
+                  { value: 'historical_average_increment', order: 'desc', label: 'Highest Historical Average' },
+                  { value: 'historical_average_increment', order: 'asc', label: 'Lowest Historical Average' },
+                  { value: 'department_average_increment', order: 'desc', label: 'Highest Department Average' },
+                  { value: 'department_average_increment', order: 'asc', label: 'Lowest Department Average' },
+                  { value: 'current_ctc', order: 'desc', label: 'Highest Current CTC' },
+                  { value: 'current_ctc', order: 'asc', label: 'Lowest Current CTC' },
+                  { value: 'projected_ctc', order: 'desc', label: 'Highest Projected CTC' },
+                  { value: 'projected_ctc', order: 'asc', label: 'Lowest Projected CTC' },
+                  { value: 'name', order: 'asc', label: 'Employee Name (A-Z)' },
+                  { value: 'name', order: 'desc', label: 'Employee Name (Z-A)' },
+                ].map((opt, idx) => (
+                  <label key={idx} className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="sortOption"
+                      checked={sortBy === opt.value && sortOrder === opt.order}
+                      onChange={() => {
+                        setSortBy(opt.value);
+                        setSortOrder(opt.order as 'asc' | 'desc');
+                      }}
+                      className="text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-700 group-hover:text-indigo-700">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Highlight Employees Section */}
+            <div>
+              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">Highlight Employees</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+                {[
+                  { id: 'above_department_average', label: 'Above Department Average' },
+                  { id: 'below_department_average', label: 'Below Department Average' },
+                  { id: 'above_historical_average', label: 'Above Historical Average' },
+                  { id: 'below_historical_average', label: 'Below Historical Average' },
+                  { id: 'completed_planning', label: 'Completed Planning' },
+                  { id: 'pending_planning', label: 'Pending Planning' },
+                  { id: 'submitted', label: 'Submitted' },
+                ].map((opt) => (
+                  <label key={opt.id} className="flex items-center gap-2 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={highlights.includes(opt.id)}
+                      onChange={() => toggleHighlight(opt.id)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-700 group-hover:text-indigo-700">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         </div>

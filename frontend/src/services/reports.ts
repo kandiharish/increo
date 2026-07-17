@@ -27,6 +27,41 @@ export interface ReportsSummary {
   records: IncrementReportRecord[];
 }
 
+export interface OutlierRecord {
+  employee_id: string;
+  name: string;
+  department_name: string;
+  current_increment: number;
+  department_avg: number;
+  historical_avg: number;
+  difference: number;
+  status: string;
+  reason: string;
+}
+
+export interface FairnessRecord {
+  employee_id: string;
+  name: string;
+  department_name: string;
+  designation: string;
+  current_increment: number;
+  designation_avg: number;
+  difference: number;
+  status: string;
+  reason: string;
+}
+
+export interface AnalysisSummary {
+  outliers: OutlierRecord[];
+  fairness_alerts: FairnessRecord[];
+  summary: {
+    high_outliers: number;
+    low_outliers: number;
+    fairness_alerts: number;
+    employees_reviewed: number;
+  };
+}
+
 export const reportsService = {
   async getReportsSummary(departmentId?: number): Promise<ReportsSummary> {
     const response = await api.get<ReportsSummary>('/reports', {
@@ -36,4 +71,11 @@ export const reportsService = {
     });
     return response.data;
   },
+
+  async getAnalysis(threshold: number = 5.0): Promise<AnalysisSummary> {
+    const response = await api.get<AnalysisSummary>('/reports/analysis', {
+      params: { threshold },
+    });
+    return response.data;
+  }
 };

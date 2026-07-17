@@ -17,7 +17,6 @@ const NumericStepper = ({
   value: number;
   onChange: (val: number) => void;
   disabled: boolean;
-  notApplicableMessage?: string;
 }) => {
   const [inputStr, setInputStr] = useState(value.toFixed(2));
   const [error, setError] = useState<string | null>(null);
@@ -49,18 +48,13 @@ const NumericStepper = ({
 
   return (
     <div className="space-y-1">
-      <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors ${error ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-slate-50/50'} ${notApplicableMessage ? 'bg-slate-100 opacity-80' : ''}`}>
-        <div className="flex flex-col">
-          <span className="text-xs font-semibold text-slate-700 w-36 leading-tight">{label}</span>
-          {notApplicableMessage && (
-            <span className="text-[9px] font-medium text-slate-400 mt-0.5">{notApplicableMessage}</span>
-          )}
-        </div>
+      <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors ${error ? 'border-red-300 bg-red-50/30' : 'border-slate-200 bg-slate-50/50'}`}>
+        <span className="text-xs font-semibold text-slate-700 w-36 leading-tight">{label}</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => step(-0.5)}
-            disabled={disabled || !!notApplicableMessage || value <= 0}
+            disabled={disabled || value <= 0}
             className="h-7 w-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 transition-colors shadow-sm"
           >
             <Minus size={12} />
@@ -69,7 +63,7 @@ const NumericStepper = ({
             <input
               type="number"
               value={inputStr}
-              disabled={disabled || !!notApplicableMessage}
+              disabled={disabled}
               onChange={(e) => setInputStr(e.target.value)}
               onBlur={(e) => commit(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && commit(inputStr)}
@@ -85,7 +79,7 @@ const NumericStepper = ({
           <button
             type="button"
             onClick={() => step(0.5)}
-            disabled={disabled || !!notApplicableMessage || value >= 50}
+            disabled={disabled || value >= 50}
             className="h-7 w-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 disabled:opacity-40 transition-colors shadow-sm"
           >
             <Plus size={12} />
@@ -605,14 +599,12 @@ export const PlanningPage: React.FC = () => {
                       value={variablePct}
                       onChange={setVariablePct}
                       disabled={!isManager}
-                      notApplicableMessage={Number(curSalary.variable_pay) === 0 ? "Not applicable" : undefined}
                     />
                     <NumericStepper
                       label="Retention Bonus %"
                       value={retentionPct}
                       onChange={setRetentionPct}
                       disabled={!isManager}
-                      notApplicableMessage={Number(curSalary.retention_bonus) === 0 ? "Not applicable" : undefined}
                     />
                     {/* Rules note */}
                     <div className="text-[10px] text-slate-400 bg-slate-50 rounded-md px-3 py-2 border border-slate-100 space-y-0.5">

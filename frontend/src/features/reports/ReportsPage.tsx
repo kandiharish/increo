@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { reportsService } from '../../services/reports';
 import { departmentsService } from '../../services/departments';
 import { formatCurrency } from '../../utils/format';
-import { Download, Printer, FileText, TrendingUp, Users, DollarSign, Lightbulb } from 'lucide-react';
+import { Download, Printer, FileText, TrendingUp, Users, DollarSign, Lightbulb, AlertTriangle, Scale } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -22,11 +22,17 @@ const PIE_COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ec4899', '#64748b'];
 
 export const ReportsPage: React.FC = () => {
   const [departmentId, setDepartmentId] = useState<number | undefined>(undefined);
+  const [outlierThreshold, setOutlierThreshold] = useState<number>(5.0);
 
   // Fetch reports data
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reports-summary', departmentId],
     queryFn: () => reportsService.getReportsSummary(departmentId),
+  });
+
+  const { data: analysisData, isLoading: analysisLoading } = useQuery({
+    queryKey: ['reports-analysis', outlierThreshold],
+    queryFn: () => reportsService.getAnalysis(outlierThreshold),
   });
 
   // Fetch departments data
@@ -79,6 +85,30 @@ export const ReportsPage: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportOutliers = () => {
+    if (!analysisData || analysisData.outliers.length === 0) return;
+    const headers = ['Employee ID', 'Name', 'Department', 'Increment %', 'Dept Avg %', 'Hist Avg %', 'Difference', 'Status', 'Reason'];
+    const rows = analysisData.outliers.map(o => [o.employee_id, o.name, o.department_name, o.current_increment, o.department_avg, o.historical_avg, o.difference, o.status, `"${o.reason}"`]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.href = encodedUri;
+    link.download = `increo_outliers_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const handleExportFairness = () => {
+    if (!analysisData || analysisData.fairness_alerts.length === 0) return;
+    const headers = ['Employee ID', 'Name', 'Department', 'Designation', 'Increment %', 'Desig Avg %', 'Difference', 'Status', 'Reason'];
+    const rows = analysisData.fairness_alerts.map(o => [o.employee_id, o.name, o.department_name, o.designation, o.current_increment, o.designation_avg, o.difference, o.status, `"${o.reason}"`]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.href = encodedUri;
+    link.download = `increo_fairness_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
   };
 
   // Derive BI metrics
@@ -406,6 +436,169 @@ export const ReportsPage: React.FC = () => {
             </div>
           </div>
           
+          {/* Section 4: Outlier & Fairness Analysis */}
+          {analysisData && (
+            <>
+              <div className="flex items-center justify-between pt-8 pb-2">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">Analysis & Integrity</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-600">Deviation Threshold:</span>
+                  <input 
+                    type="number" 
+                    value={outlierThreshold}
+                    onChange={(e) => setOutlierThreshold(Number(e.target.value) || 5.0)}
+                    className="w-16 rounded border border-[#cbd5e1] px-2 py-1 text-xs text-center focus:border-indigo-600 focus:outline-none"
+                  />
+                  <span className="text-xs font-semibold text-slate-600">%</span>
+                </div>
+              </div>
+
+              {/* Analysis Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 no-print">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-red-100 text-red-600 rounded-md"><TrendingUp size={14} /></div>
+                    <span className="text-[10px] text-red-700 font-bold uppercase tracking-wider">High Outliers</span>
+                  </div>
+                  <span className="text-xl font-bold text-red-800">{analysisData.summary.high_outliers}</span>
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-blue-100 text-blue-600 rounded-md"><TrendingUp size={14} className="rotate-180" /></div>
+                    <span className="text-[10px] text-blue-700 font-bold uppercase tracking-wider">Low Outliers</span>
+                  </div>
+                  <span className="text-xl font-bold text-blue-800">{analysisData.summary.low_outliers}</span>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-amber-100 text-amber-600 rounded-md"><Scale size={14} /></div>
+                    <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Fairness Alerts</span>
+                  </div>
+                  <span className="text-xl font-bold text-amber-800">{analysisData.summary.fairness_alerts}</span>
+                </div>
+                <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-1.5 bg-slate-100 text-slate-600 rounded-md"><Users size={14} /></div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Employees Reviewed</span>
+                  </div>
+                  <span className="text-xl font-bold text-slate-900">{analysisData.summary.employees_reviewed}</span>
+                </div>
+              </div>
+
+              {/* Outlier Analysis Table */}
+              <div className="rounded-xl border border-red-200 bg-white shadow-sm overflow-hidden print-border mt-6">
+                <div className="px-6 py-4 border-b border-red-100 bg-red-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-red-500" />
+                    <h2 className="text-sm font-bold text-slate-900">Outlier Analysis</h2>
+                  </div>
+                  <button onClick={handleExportOutliers} className="text-[10px] font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 uppercase tracking-wider">
+                    <Download size={12} /> Export Outliers
+                  </button>
+                </div>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
+                      <tr className="border-b border-[#cbd5e1] font-semibold text-slate-500 uppercase tracking-wider text-[9px]">
+                        <th className="px-5 py-3">Employee</th>
+                        <th className="px-5 py-3">Department</th>
+                        <th className="px-5 py-3 text-center">Inc %</th>
+                        <th className="px-5 py-3 text-center">Dept Avg %</th>
+                        <th className="px-5 py-3 text-center">Hist Avg %</th>
+                        <th className="px-5 py-3 text-center">Difference</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3 min-w-[200px]">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f1f5f9] text-slate-700">
+                      {analysisData.outliers.length === 0 ? (
+                        <tr><td colSpan={8} className="px-5 py-8 text-center text-slate-400">No outliers detected within {outlierThreshold}% threshold.</td></tr>
+                      ) : (
+                        analysisData.outliers.map((rec) => (
+                          <tr key={rec.employee_id} className="hover:bg-slate-50/50">
+                            <td className="px-5 py-3">
+                              <span className="font-semibold text-slate-900 block">{rec.name}</span>
+                              <span className="font-mono text-[10px] text-slate-400">{rec.employee_id}</span>
+                            </td>
+                            <td className="px-5 py-3 text-slate-500">{rec.department_name}</td>
+                            <td className="px-5 py-3 text-center font-bold text-slate-900">{rec.current_increment.toFixed(1)}%</td>
+                            <td className="px-5 py-3 text-center font-mono text-slate-500">{rec.department_avg.toFixed(1)}%</td>
+                            <td className="px-5 py-3 text-center font-mono text-slate-500">{rec.historical_avg > 0 ? rec.historical_avg.toFixed(1) + '%' : '-'}</td>
+                            <td className={`px-5 py-3 text-center font-bold ${rec.difference > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                              {rec.difference > 0 ? '+' : ''}{rec.difference.toFixed(1)}%
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className={`inline-block rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                                rec.status === 'High Outlier' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>{rec.status}</span>
+                            </td>
+                            <td className="px-5 py-3 text-slate-500 text-[10px]">{rec.reason}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Fairness Analysis Table */}
+              <div className="rounded-xl border border-amber-200 bg-white shadow-sm overflow-hidden print-border mt-6 mb-8">
+                <div className="px-6 py-4 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Scale size={16} className="text-amber-600" />
+                    <h2 className="text-sm font-bold text-slate-900">Fairness Analysis</h2>
+                  </div>
+                  <button onClick={handleExportFairness} className="text-[10px] font-semibold text-slate-500 hover:text-indigo-600 flex items-center gap-1 uppercase tracking-wider">
+                    <Download size={12} /> Export Fairness
+                  </button>
+                </div>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
+                      <tr className="border-b border-[#cbd5e1] font-semibold text-slate-500 uppercase tracking-wider text-[9px]">
+                        <th className="px-5 py-3">Employee</th>
+                        <th className="px-5 py-3">Department</th>
+                        <th className="px-5 py-3">Designation</th>
+                        <th className="px-5 py-3 text-center">Inc %</th>
+                        <th className="px-5 py-3 text-center">Role Avg %</th>
+                        <th className="px-5 py-3 text-center">Difference</th>
+                        <th className="px-5 py-3">Status</th>
+                        <th className="px-5 py-3 min-w-[200px]">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f1f5f9] text-slate-700">
+                      {analysisData.fairness_alerts.length === 0 ? (
+                        <tr><td colSpan={8} className="px-5 py-8 text-center text-slate-400">No fairness alerts detected within {outlierThreshold}% threshold.</td></tr>
+                      ) : (
+                        analysisData.fairness_alerts.map((rec) => (
+                          <tr key={rec.employee_id} className="hover:bg-slate-50/50">
+                            <td className="px-5 py-3">
+                              <span className="font-semibold text-slate-900 block">{rec.name}</span>
+                              <span className="font-mono text-[10px] text-slate-400">{rec.employee_id}</span>
+                            </td>
+                            <td className="px-5 py-3 text-slate-500">{rec.department_name}</td>
+                            <td className="px-5 py-3 text-slate-600 font-medium">{rec.designation}</td>
+                            <td className="px-5 py-3 text-center font-bold text-slate-900">{rec.current_increment.toFixed(1)}%</td>
+                            <td className="px-5 py-3 text-center font-mono text-slate-500">{rec.designation_avg.toFixed(1)}%</td>
+                            <td className={`px-5 py-3 text-center font-bold text-amber-600`}>
+                              {rec.difference > 0 ? '+' : ''}{rec.difference.toFixed(1)}%
+                            </td>
+                            <td className="px-5 py-3">
+                              <span className="inline-block rounded-md border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border-amber-200">
+                                {rec.status}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-slate-500 text-[10px]">{rec.reason}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
       )}
     </div>

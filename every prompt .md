@@ -1,213 +1,273 @@
-# Fix Business Logic: Variable Pay and Retention Bonus Are Not Reflected in Compensation Breakdown
+# Enhancement Request: Improve Employee Comparison Filters Architecture
 
-## Problem
+## Objective
 
-Currently, the application allows managers to modify:
+Enhance the existing **Employee Workspace Filters** by adding intelligent sorting and comparison capabilities while maintaining good backend architecture, scalability, and clean API design.
 
-- Fixed Salary %
-- Variable Pay %
-- Retention Bonus %
-
-However, only the Fixed Salary increment affects the calculations.
-
-Example:
-
-Input:
-- Fixed Salary = 1.50%
-- Variable Pay = 1.50%
-- Retention Bonus = 1.00%
-
-Current Output:
-
-Fixed Pay
-₹31,33,680 → ₹31,80,685 ✅
-
-Variable Pay
-₹0 → ₹0 ❌
-
-Retention Bonus
-₹0 → ₹0 ❌
-
-Difference Amount
-Calculated only from Fixed Pay
-
-This creates a confusing user experience because the manager expects every editable field to influence the projected compensation.
+The feature should be implemented inside the existing **Filters** drawer. Do **not** create a separate page or comparison module.
 
 ---
 
-# Required Behaviour
+# 1. Backend API Design
 
-The system must implement one of the following business rules consistently.
+Instead of using generic parameters like:
 
-## Case 1 (Preferred)
+```
+sort=highest_increment
+compare_filters=[]
+```
 
-If Variable Pay and Retention Bonus are configurable compensation components, they must participate in the projected salary calculation.
+implement a more scalable API.
 
-When a manager updates:
+Example
 
-- Fixed Salary %
-- Variable Pay %
-- Retention Bonus %
+```
+GET /employees
 
-the following must update immediately:
+?department=Engineering
+&designation=Software Engineer
+&status=Completed
+&search=Harsh
+&sort_by=current_year_increment
+&sort_order=desc
+&highlight=above_department_average
+```
 
-- Projected Variable Pay
-- Projected Retention Bonus
+This makes the API cleaner, extensible, and easier to maintain.
+
+---
+
+# 2. Backend Architecture
+
+Currently, computed metrics such as
+
+- Current Year Increment
+- Historical Average
+- Department Average
 - Projected CTC
-- Difference Amount
-- Current Year Increment %
-- Budget Variance
-- Reports
-- Dashboard
-- Payroll calculations
 
-The Compensation Breakdown should clearly display:
+are calculated inside the service layer after fetching employee records.
 
-Current Variable Pay
-↓
+Retain this approach for now since the dataset size is small, but improve the architecture by separating responsibilities.
 
-Projected Variable Pay
+Create three logical steps:
 
-Current Retention Bonus
-↓
+### Step 1
 
-Projected Retention Bonus
+Fetch employees using SQL filters
 
-instead of remaining zero.
+- Department
+- Designation
+- Manager
+- Search
+- Status
 
----
+### Step 2
 
-## Case 2
+Calculate employee metrics
 
-If an employee is NOT eligible for Variable Pay or Retention Bonus, the UI should NOT allow editing.
+- Current Year Increment
+- Historical Average
+- Department Average
+- Current CTC
+- Projected CTC
 
-Instead:
+using a reusable calculation/helper service.
 
-- Disable the controls
-- Show them as read-only
-- Display an informational tooltip or badge such as
+Avoid mixing business calculations with sorting logic.
 
-"Not applicable for this employee"
+### Step 3
 
-or
+Apply
 
-"Employee is not eligible for Variable Pay"
+- Sorting
+- Highlight Filters
+- Pagination
 
-This prevents managers from entering values that have no effect.
+after calculations are completed.
 
----
-
-# Backend Verification
-
-Review the calculation service responsible for projected compensation.
-
-Verify that:
-
-Projected Variable Pay
-
-is calculated from the configured percentage.
-
-Verify that:
-
-Projected Retention Bonus
-
-is calculated from the configured percentage.
-
-Ensure both values contribute to:
-
-Projected CTC
-
-Difference Amount
-
-Current Year Increment
-
-Budget Variance
-
-Department Payroll
-
-Reports
-
-Dashboard Analytics
+This keeps the code modular and allows future migration of calculations into SQL without changing API behavior.
 
 ---
 
-# Compensation Breakdown
+# 3. Filters UI
 
-Current
+Enhance the existing Filters drawer.
 
-Current Variable Pay
+Keep the current filters.
 
-₹0 → ₹0
-
-Current Retention Bonus
-
-₹0 → ₹0
-
-Required
-
-If applicable:
-
-Variable Pay
-
-₹50,000 → ₹57,500
-
-Retention Bonus
-
-₹25,000 → ₹27,500
-
-If not applicable:
-
-Display
-
-Not Applicable
-
-instead of editable inputs.
+Below them add two new sections.
 
 ---
 
-# Financial Impact
+## Sort By
 
-The Financial Impact card must include every editable compensation component.
+Allow only one active option.
 
-Projected CTC should equal
+Options
 
-Current Fixed
-+ Incremented Fixed
+• Default
+
+• Highest Current Year Increment
+
+• Lowest Current Year Increment
+
+• Highest Historical Average
+
+• Lowest Historical Average
+
+• Highest Department Average
+
+• Lowest Department Average
+
+• Highest Current CTC
+
+• Lowest Current CTC
+
+• Highest Projected CTC
+
+• Lowest Projected CTC
+
+• Employee Name (A–Z)
+
+• Employee Name (Z–A)
+
+---
+
+## Highlight Employees
+
+Instead of naming this "Comparison Filters", use a more business-friendly title.
+
+Title
+
+Highlight Employees
+
+Options
+
+☐ Above Department Average
+
+☐ Below Department Average
+
+☐ Above Historical Average
+
+☐ Below Historical Average
+
+☐ Completed Planning
+
+☐ Pending Planning
+
+☐ Submitted
+
+These should work as filters, not just highlights.
+
+---
+
+# 4. Filter Combination Support
+
+All filters must work together.
+
+Example
+
+Department
+
+Engineering
 
 +
 
-Current Variable
-+ Incremented Variable
+Status
+
+Completed
 
 +
 
-Current Retention Bonus
-+ Incremented Retention Bonus
+Highlight
+
+Above Department Average
 
 +
 
-Mediclaim
+Sort
 
-+
+Highest Increment
 
-Gratuity (if business rule says fixed)
-
-Difference Amount must equal
-
-Projected CTC − Current CTC
-
-Current Year Increment % must be derived from the final projected CTC.
+The final employee table should display only employees matching all selected conditions.
 
 ---
 
-# Acceptance Criteria
+# 5. Search Compatibility
 
-- Fixed Salary affects projected salary.
-- Variable Pay affects projected salary.
-- Retention Bonus affects projected salary.
-- Compensation Breakdown reflects all updated values.
-- Financial Impact updates correctly.
-- Dashboard and Reports remain consistent.
-- If an employee is not eligible for Variable Pay or Retention Bonus, those controls are disabled or clearly marked as "Not Applicable" instead of accepting input with no effect.
+Search should work together with every filter.
 
-The application should never allow managers to enter editable values that do not influence the calculations without clearly explaining why.
+Example
+
+Search
+
+Harsh
+
++
+
+Department
+
+Engineering
+
++
+
+Above Department Average
+
+Only matching employees should appear.
+
+---
+
+# 6. Pagination
+
+Pagination must occur **after**
+
+- calculations
+- sorting
+- filtering
+
+so the user always receives correctly ordered data.
+
+---
+
+# 7. Export
+
+CSV
+
+Excel
+
+PDF
+
+must export the currently visible employee list after all filters and sorting have been applied.
+
+---
+
+# 8. Performance
+
+For the current project size, performing calculations in Python before pagination is acceptable.
+
+However, design the calculation logic as an independent reusable module so that in the future it can be migrated into SQL or materialized views without changing the frontend or API contract.
+
+Do not tightly couple calculations with sorting logic.
+
+---
+
+# 9. Acceptance Criteria
+
+✅ New comparison functionality is integrated into the existing Filters drawer.
+
+✅ No additional comparison page is created.
+
+✅ Backend uses clean API parameters (sort_by, sort_order, highlight).
+
+✅ Employee calculations remain centralized in one reusable service.
+
+✅ Sorting and highlighting work together.
+
+✅ Department, search, status, designation, and manager filters continue to work correctly.
+
+✅ Pagination returns correctly sorted and filtered employees.
+
+✅ CSV, Excel, and PDF exports match the filtered employee list.
+
+✅ Architecture is modular and scalable for future growth.

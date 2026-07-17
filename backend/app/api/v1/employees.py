@@ -27,6 +27,9 @@ def get_employees(
     department_id: Optional[int] = Query(None),
     designation: Optional[str] = Query(None),
     manager_id: Optional[int] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_order: Optional[str] = Query(None, regex="^(asc|desc)$"),
+    highlight: Optional[List[str]] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -43,7 +46,10 @@ def get_employees(
         search=search,
         department_id=department_id,
         designation=designation,
-        manager_id=manager_id
+        manager_id=manager_id,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        highlight=highlight
     )
     return {
         "items": items,

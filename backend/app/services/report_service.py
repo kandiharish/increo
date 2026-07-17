@@ -21,3 +21,10 @@ class ReportService:
             "departments": departments,
             "records": records
         }
+
+    def get_analysis(self, current_user: User, threshold: float = 5.0) -> Dict[str, Any]:
+        """
+        Coordinates database queries to fetch outliers and fairness alerts.
+        """
+        manager_id = current_user.id if current_user.role.name == "Manager" else None
+        return self.report_repo.get_analysis_data(manager_id, threshold)

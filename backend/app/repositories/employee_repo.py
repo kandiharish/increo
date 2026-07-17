@@ -61,3 +61,43 @@ class EmployeeRepository:
         total = query.count()
         results = query.offset(skip).limit(limit).all()
         return results, total
+
+    def get_employees_unpaginated(
+        self,
+        search: Optional[str] = None,
+        manager_id: Optional[int] = None,
+        department_id: Optional[int] = None,
+        designation: Optional[str] = None,
+    ) -> List[Employee]:
+        """
+        Fetch all matching employees with eager loaded relationships.
+        No offset/limit is applied.
+        """
+        query = self.db.query(Employee).options(
+            joinedload(Employee.department),
+            joinedload(Employee.manager),
+            joinedload(Employee.current_salary),
+            joinedload(Employee.planning_inputs),
+            joinedload(Employee.projection),
+            joinedload(Employee.salary_history)
+        )
+        
+        # Apply role scoping/filters
+        if manager_id is not None:
+            query = query.filter(Employee.manager_id == manager_id)
+        if department_id is not None:
+            query = query.filter(Employee.department_id == department_id)
+        if designation:
+            query = query.filter(Employee.current_designation == designation)
+            
+        # Apply search text (name, id, or current designation)
+        if search:
+            query = query.filter(
+                or_(
+                    Employee.name.ilike(f"%{search}%"),
+                    Employee.id.ilike(f"%{search}%"),
+                    Employee.current_designation.ilike(f"%{search}%")
+                )
+            )
+            
+        return query.all()

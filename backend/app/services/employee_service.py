@@ -22,24 +22,23 @@ class EmployeeService:
         department_id: Optional[int] = None,
         designation: Optional[str] = None,
         manager_id: Optional[int] = None,
+        sort_by: Optional[str] = None,
+        sort_order: Optional[str] = None,
+        highlight: Optional[List[str]] = None,
     ) -> Tuple[List[Dict[str, Any]], int]:
         """
         Retrieves a paginated and formatted list of employees.
-        Retrieves a paginated and formatted list of employees.
         Enforces manager reporting scoping.
         Includes three analytics columns: current_year_increment, historical_average_increment,
-        and department_average_increment — all computed without N+1 queries.
+        and department_average_increment.
+        Performs 3-step pipeline: Fetch -> Calculate -> Highlight/Sort/Paginate.
         """
-        # If user is a Manager, override manager filter with the user's ID
-        # to restrict query results to their reportees
         active_manager_id = manager_id
         if current_user.role.name == "Manager":
             active_manager_id = current_user.id
 
-        skip = (page - 1) * limit
-        employees, total = self.employee_repo.get_employees_paginated(
-            skip=skip,
-            limit=limit,
+        # STEP 1: SQL Fetch (Unpaginated)
+        employees = self.employee_repo.get_employees_unpaginated(
             search=search,
             manager_id=active_manager_id,
             department_id=department_id,
@@ -82,29 +81,25 @@ class EmployeeService:
         }
         # ─────────────────────────────────────────────────────────────────────
 
+        # STEP 2: Calculate Metrics
         formatted_items = []
         for emp in employees:
-            # 1. Sum current CTC components
             current_ctc = Decimal('0.0')
             if emp.current_salary:
                 sal = emp.current_salary
                 current_ctc = sal.fixed_pay + sal.variable_pay + sal.mediclaim + sal.gratuity + sal.retention_bonus
                 
-            # 2. Extract projected CTC
             projected_ctc = Decimal('0.0')
             if emp.projection:
                 projected_ctc = emp.projection.projected_ctc
                 
-            # 3. Resolve planning status
             planning_status = "Not Started"
             if emp.planning_inputs:
                 planning_status = emp.planning_inputs[0].status if len(emp.planning_inputs) > 0 else "Not Started"
 
-            # 4. Current Year Increment % = ((projected - current) / current) * 100
             metrics = CalculationEngine.calculate_increment_metrics(current_ctc, projected_ctc)
             current_year_increment = metrics["current_year_increment_percentage"]
 
-            # 5. Historical Average Increment (already joined via salary_history eager load)
             historical_average_increment = None
             if emp.salary_history and len(emp.salary_history) >= 2:
                 history = sorted(emp.salary_history, key=lambda x: x.financial_year)
@@ -133,6 +128,65 @@ class EmployeeService:
                 "historical_average_increment": historical_average_increment,
                 "department_average_increment": department_average_increment,
             })
+
+        # STEP 3: Apply Highlights, Sorting, and Pagination
+        
+        # 3a. Highlight Filters
+        if highlight:
+            filtered_items = []
+            for item in formatted_items:
+                keep = True
+                if "above_department_average" in highlight:
+                    if item["current_year_increment"] is None or item["department_average_increment"] is None or item["current_year_increment"] <= item["department_average_increment"]:
+                        keep = False
+                if "below_department_average" in highlight:
+                    if item["current_year_increment"] is None or item["department_average_increment"] is None or item["current_year_increment"] >= item["department_average_increment"]:
+                        keep = False
+                if "above_historical_average" in highlight:
+                    if item["current_year_increment"] is None or item["historical_average_increment"] is None or item["current_year_increment"] <= item["historical_average_increment"]:
+                        keep = False
+                if "below_historical_average" in highlight:
+                    if item["current_year_increment"] is None or item["historical_average_increment"] is None or item["current_year_increment"] >= item["historical_average_increment"]:
+                        keep = False
+                if "completed_planning" in highlight:
+                    if item["planning_status"] != "Completed":
+                        keep = False
+                if "pending_planning" in highlight:
+                    if item["planning_status"] not in ["Not Started", "In Progress", "Draft", "Pending"]: # Or just "Pending" depending on exact logic
+                        # From UI: we have Not Started, In Progress, Completed
+                        if item["planning_status"] == "Completed":
+                            keep = False
+                if "submitted" in highlight:
+                    if item["planning_status"] != "Submitted":
+                        keep = False
+                if keep:
+                    filtered_items.append(item)
+            formatted_items = filtered_items
+
+        # 3b. Sorting
+        if sort_by:
+            reverse = True if sort_order == "desc" else False
+            
+            def get_sort_key(item):
+                val = item.get(sort_by)
+                if val is None:
+                    # Sort nulls to the bottom regardless of order, or use a sentinel
+                    # For a generic solution:
+                    if isinstance(item.get("current_ctc"), (int, float, Decimal)):
+                        return float('-inf') if reverse else float('inf')
+                    return ""
+                return val
+
+            # Special handling for name sort
+            if sort_by == "name":
+                formatted_items.sort(key=lambda x: (x["name"] or "").lower(), reverse=reverse)
+            else:
+                formatted_items.sort(key=get_sort_key, reverse=reverse)
+
+        # 3c. Pagination
+        total = len(formatted_items)
+        skip = (page - 1) * limit
+        formatted_items = formatted_items[skip : skip + limit]
 
         return formatted_items, total
 
